@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Second Brain — per-workspace isolation. Every doc carries `memberIds`; a user
+// can only touch a document if their uid is in that list. This keeps businesses
+// (Office / Freelance / LeadX) fully separated with no cross-workspace bleed.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isMember(data) {
+      return signedIn() && request.auth.uid in data.memberIds;
+    }
+
+    match /workspaces/{id} {
+      allow read: if isMember(resource.data);
+      allow create: if isMember(request.resource.data)
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isMember(resource.data) && isMember(request.resource.data);
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /projects/{id} {
+      allow read: if isMember(resource.data);
+      allow create: if isMember(request.resource.data);
+      allow update, delete: if isMember(resource.data);
+    }
+
+    match /tasks/{id} {
+      allow read: if isMember(resource.data);
+      allow create: if isMember(request.resource.data);
+      allow update, delete: if isMember(resource.data);
+    }
+  }
+}

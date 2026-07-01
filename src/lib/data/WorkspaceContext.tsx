@@ -1,0 +1,154 @@
+"use client";
+
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useAuth } from "@/lib/auth/AuthContext";
+import type { Project, Task, Workspace } from "@/lib/types";
+import {
+  seedNewUser,
+  watchProjects,
+  watchTasks,
+  watchWorkspaces,
+} from "./firestore";
+
+interface WorkspaceState {
+  workspaces: Workspace[];
+  projects: Project[];
+  tasks: Task[];
+  currentWorkspace: Workspace | null;
+  currentProject: Project | null;
+  loading: boolean;
+  seeding: boolean;
+  tasksLoading: boolean;
+  selectWorkspace: (id: string) => void;
+  selectProject: (id: string) => void;
+}
+
+const Ctx = createContext<WorkspaceState | null>(null);
+
+const LS_WS = "sb-current-ws";
+const LS_PROJ = "sb-current-proj";
+
+export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [wsLoaded, setWsLoaded] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const seededRef = useRef(false);
+
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+
+  // 1. Watch workspaces; seed a new user exactly once.
+  useEffect(() => {
+    if (!user) {
+      setWorkspaces([]);
+      setWsLoaded(false);
+      return;
+    }
+    const unsub = watchWorkspaces(user.uid, async (ws) => {
+      setWorkspaces(ws);
+      setWsLoaded(true);
+      if (ws.length === 0 && !seededRef.current) {
+        seededRef.current = true;
+        setSeeding(true);
+        try {
+          await seedNewUser(user);
+        } catch (e) {
+          console.error("seed failed", e);
+        } finally {
+          setSeeding(false);
+        }
+      }
+    });
+    return () => unsub();
+  }, [user]);
+
+  // 2. Keep the selected workspace valid + remembered.
+  useEffect(() => {
+    if (!workspaces.length) {
+      setCurrentWorkspaceId(null);
+      return;
+    }
+    setCurrentWorkspaceId((cur) => {
+      if (cur && workspaces.some((w) => w.id === cur)) return cur;
+      const saved = typeof window !== "undefined" ? localStorage.getItem(LS_WS) : null;
+      return saved && workspaces.some((w) => w.id === saved) ? saved : workspaces[0].id;
+    });
+  }, [workspaces]);
+
+  // 3. Watch projects of the current workspace.
+  useEffect(() => {
+    if (!currentWorkspaceId) {
+      setProjects([]);
+      return;
+    }
+    if (typeof window !== "undefined") localStorage.setItem(LS_WS, currentWorkspaceId);
+    const unsub = watchProjects(currentWorkspaceId, setProjects);
+    return () => unsub();
+  }, [currentWorkspaceId]);
+
+  // 4. Keep the selected project valid within the current workspace.
+  useEffect(() => {
+    setCurrentProjectId((cur) => {
+      if (cur && projects.some((p) => p.id === cur)) return cur;
+      const saved = typeof window !== "undefined" ? localStorage.getItem(LS_PROJ) : null;
+      if (saved && projects.some((p) => p.id === saved)) return saved;
+      return projects[0]?.id ?? null;
+    });
+  }, [projects]);
+
+  // 5. Watch tasks of the current project.
+  useEffect(() => {
+    if (!currentProjectId) {
+      setTasks([]);
+      setTasksLoading(false);
+      return;
+    }
+    if (typeof window !== "undefined") localStorage.setItem(LS_PROJ, currentProjectId);
+    setTasksLoading(true);
+    const unsub = watchTasks(currentProjectId, (t) => {
+      setTasks(t);
+      setTasksLoading(false);
+    });
+    return () => unsub();
+  }, [currentProjectId]);
+
+  const value = useMemo<WorkspaceState>(() => {
+    const currentWorkspace = workspaces.find((w) => w.id === currentWorkspaceId) ?? null;
+    const currentProject = projects.find((p) => p.id === currentProjectId) ?? null;
+    return {
+      workspaces,
+      projects,
+      tasks,
+      currentWorkspace,
+      currentProject,
+      loading: !wsLoaded,
+      seeding,
+      tasksLoading,
+      selectWorkspace: (id) => {
+        setCurrentWorkspaceId(id);
+        setCurrentProjectId(null); // let effect 4 pick the first project of the new ws
+      },
+      selectProject: setCurrentProjectId,
+    };
+  }, [workspaces, projects, tasks, currentWorkspaceId, currentProjectId, wsLoaded, seeding, tasksLoading]);
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+export function useWorkspace(): WorkspaceState {
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error("useWorkspace must be used within WorkspaceProvider");
+  return ctx;
+}
