@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, Link2, Trash2, X } from "lucide-react";
-import type { Task } from "@/lib/types";
+import { FileText, Link2, Sparkles, Trash2, X } from "lucide-react";
+import type { RetrievedChunk, Task } from "@/lib/types";
 import { statusMeta } from "@/lib/constants";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { useTaskActions } from "@/lib/data/useTaskActions";
+import { postJSON } from "@/lib/api";
 import { relativeTime } from "@/lib/date";
 import { shortId } from "@/lib/utils";
 import { StatusControl } from "@/components/ui/StatusControl";
@@ -19,11 +20,27 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
   const live = tasks.find((t) => t.id === task?.id) ?? task;
   const [title, setTitle] = useState(live?.title ?? "");
   const [notes, setNotes] = useState(live?.notes ?? "");
+  const [related, setRelated] = useState<RetrievedChunk[] | null>(null);
 
   useEffect(() => {
     setTitle(live?.title ?? "");
     setNotes(live?.notes ?? "");
-  }, [live?.id]); // reset when a different task opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live?.id]); // reset only when a different task opens
+
+  // Smart linking: surface knowledge-base docs related to this task.
+  useEffect(() => {
+    if (!task) return;
+    let cancelled = false;
+    setRelated(null);
+    postJSON<{ chunks: RetrievedChunk[] }>("/api/related", { projectId: task.projectId, query: task.title })
+      .then((r) => !cancelled && setRelated(r.chunks))
+      .catch(() => !cancelled && setRelated([]));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id, task?.projectId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -138,7 +155,39 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
             <QuickAdd placeholder="Add subtask" onAdd={(t) => actions.addSubtask(live.id, t)} />
           </div>
 
-          {/* linked docs (smart linking) */}
+          {/* related from knowledge base (smart linking) */}
+          <div className="mt-5">
+            <span className="mb-1.5 flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-text-faint">
+              <Sparkles className="h-3 w-3 text-accent" /> Related from knowledge base
+            </span>
+            {related === null ? (
+              <div className="space-y-1">
+                <div className="shimmer h-9 rounded-md bg-surface-2" />
+                <div className="shimmer h-9 rounded-md bg-surface-2" />
+              </div>
+            ) : related.length === 0 ? (
+              <p className="text-2xs text-text-faint">
+                No related documents yet. Add files in the Knowledge base to power this.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {related.map((d) => (
+                  <div key={d.id} className="rounded-md border border-border bg-surface-2 px-2.5 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+                      <span className="flex-1 truncate text-[13px] text-text">{d.source}</span>
+                      <span className="mono text-2xs text-text-faint">{d.score.toFixed(2)}</span>
+                    </div>
+                    <p className="mt-0.5 line-clamp-2 pl-[22px] text-2xs leading-relaxed text-text-muted">
+                      {d.text.slice(0, 160)}…
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* linked docs */}
           {live.linkedDocs.length > 0 && (
             <div className="mt-5">
               <span className="mb-1.5 flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-text-faint">

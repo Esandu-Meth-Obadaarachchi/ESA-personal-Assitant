@@ -28,6 +28,18 @@ export default function ProjectViewPage() {
     localStorage.setItem("sb-tab", t);
   };
 
+  // Deep-link support: /?task=<id> opens that task's drawer once it loads
+  // (used by the agent standup to jump to a task).
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("task");
+    if (!id) return;
+    const found = tasks.find((t) => t.id === id);
+    if (found) {
+      setSelected(found);
+      window.history.replaceState(null, "", "/");
+    }
+  }, [tasks]);
+
   if (loading) {
     return (
       <div className="grid h-full place-items-center">
