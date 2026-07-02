@@ -18,6 +18,29 @@ export interface WorkspaceMember {
   email: string;
   photoURL?: string | null;
   role: MemberRole;
+  /**
+   * Project scope. `null`/absent => access to the whole workspace (and any
+   * project added later). An array => access limited to exactly these project
+   * ids. The owner is always full-access.
+   */
+  scope?: string[] | null;
+}
+
+/** A pending share invitation, keyed by the invitee's email. Server-managed. */
+export interface Invite {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceEmoji: string;
+  /** lower-cased invitee email. */
+  email: string;
+  role: MemberRole;
+  /** null => whole workspace; array => specific project ids. */
+  scope: string[] | null;
+  invitedByUid: string;
+  invitedByName: string;
+  createdAt: number;
+  status: "pending" | "accepted";
 }
 
 export interface Workspace {
@@ -43,6 +66,8 @@ export interface Project {
   /** The per-workspace catch-all for tasks not tied to a real project. */
   isInbox?: boolean;
   createdAt: number;
+  /** Denormalised access list — full-access members + members scoped to this project. */
+  memberIds?: string[];
 }
 
 export interface LinkedDoc {

@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { postJSON } from "@/lib/api";
 import type { Project, Task, Workspace } from "@/lib/types";
 import {
   ensureInbox,
@@ -135,6 +136,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     });
     return () => unsub();
   }, [currentProjectId]);
+
+  // Claim any pending share invites for this user's email. New memberships then
+  // stream in through watchWorkspaces (array-contains uid) automatically.
+  const acceptedRef = useRef(false);
+  useEffect(() => {
+    if (!user || acceptedRef.current) return;
+    acceptedRef.current = true;
+    postJSON("/api/share", { action: "accept" }).catch(() => {});
+  }, [user]);
 
   // Watch every task the user can see; the calendar + overview use the
   // workspace-wide slice (all projects), not just the selected project.

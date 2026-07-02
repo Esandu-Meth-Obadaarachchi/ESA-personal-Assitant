@@ -57,7 +57,7 @@ export function Sidebar() {
       workspaceId: currentWorkspace.id,
       projectId: inboxProject.id,
       title,
-      memberIds: currentWorkspace.memberIds,
+      memberIds: inboxProject.memberIds ?? currentWorkspace.memberIds,
       createdBy: user.uid,
       assignee: { id: user.uid, name: user.displayName ?? "You", avatar: user.photoURL },
     });

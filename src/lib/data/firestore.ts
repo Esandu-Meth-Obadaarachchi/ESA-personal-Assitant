@@ -137,10 +137,17 @@ export async function createProject(
     archived: false,
     isInbox: opts.isInbox ?? false,
     createdAt: Date.now(),
-    // denormalised for rules
-    memberIds: workspace.memberIds,
+    // denormalised for rules. Only full-access members (scope == null) inherit a
+    // newly created project; project-scoped teammates are added explicitly.
+    memberIds: fullAccessUids(workspace),
   } as Omit<Project, "id"> & { memberIds: string[] });
   return ref.id;
+}
+
+/** uids of workspace members with whole-workspace access (no project scope). */
+export function fullAccessUids(workspace: Workspace): string[] {
+  if (!workspace.members?.length) return workspace.memberIds;
+  return workspace.members.filter((m) => m.scope == null).map((m) => m.uid);
 }
 
 export async function updateProject(id: string, patch: Partial<Project>) {
