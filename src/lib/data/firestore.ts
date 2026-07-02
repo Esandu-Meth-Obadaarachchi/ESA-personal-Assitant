@@ -147,6 +147,64 @@ export async function updateProject(id: string, patch: Partial<Project>) {
 }
 
 /**
+ * Guarantee a workspace has exactly one Inbox, healing any duplicates.
+ *
+ * Duplicate inboxes appeared when two tabs/devices each saw "no inbox yet"
+ * (before the create's snapshot arrived) and both created one. This reads the
+ * live set from Firestore (not the possibly-stale in-memory snapshot), keeps the
+ * oldest inbox as canonical, moves stray tasks onto it and deletes the extras.
+ * An in-flight guard stops the same tab from racing itself.
+ */
+const inboxInFlight = new Map<string, Promise<string>>();
+
+export async function ensureInbox(workspace: Workspace, uid: string): Promise<string> {
+  const existing = inboxInFlight.get(workspace.id);
+  if (existing) return existing;
+
+  const run = (async () => {
+    const database = requireDb();
+    const snap = await getDocs(
+      query(collection(database, "projects"), where("memberIds", "array-contains", uid))
+    );
+    const inboxes = snap.docs
+      .filter((d) => d.data().workspaceId === workspace.id && d.data().isInbox)
+      .sort((a, b) => (a.data().createdAt ?? 0) - (b.data().createdAt ?? 0));
+
+    if (inboxes.length === 0) {
+      return createProject(workspace, "Inbox", {
+        isInbox: true,
+        description: "Loose tasks not tied to a project",
+      });
+    }
+
+    const canonical = inboxes[0];
+    const dupes = inboxes.slice(1);
+    if (dupes.length === 0) return canonical.id;
+
+    // Merge: repoint every task on a duplicate inbox to the canonical one, then
+    // delete the duplicate project docs.
+    const dupeIds = new Set(dupes.map((d) => d.id));
+    const taskSnap = await getDocs(
+      query(collection(database, "tasks"), where("memberIds", "array-contains", uid))
+    );
+    const strays = taskSnap.docs.filter((d) => dupeIds.has(d.data().projectId));
+
+    const batch = writeBatch(database);
+    strays.forEach((t) => batch.update(t.ref, { projectId: canonical.id, updatedAt: Date.now() }));
+    dupes.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+    return canonical.id;
+  })();
+
+  inboxInFlight.set(workspace.id, run);
+  try {
+    return await run;
+  } finally {
+    inboxInFlight.delete(workspace.id);
+  }
+}
+
+/**
  * Delete a workspace and everything under it (projects + tasks). Queries by
  * `memberIds` (the only rule-satisfying list filter), narrows by workspace, then
  * batch-deletes in chunks of 400 to stay under the 500-op batch limit.
