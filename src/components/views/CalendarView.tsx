@@ -28,7 +28,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { useTaskActions } from "@/lib/data/useTaskActions";
 import { authedFetch } from "@/lib/api";
-import { statusMeta } from "@/lib/constants";
 import { toISODate } from "@/lib/date";
 import type { Task } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
@@ -45,10 +44,11 @@ interface GEvent {
 }
 
 export function CalendarView({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
-  const { tasks } = useWorkspace();
+  const { workspaceTasks: tasks, projects } = useWorkspace();
   const actions = useTaskActions();
   const [month, setMonth] = useState(() => new Date());
   const [activeId, setActiveId] = useState<string | null>(null);
+  const projColor = useMemo(() => new Map(projects.map((p) => [p.id, p.color])), [projects]);
 
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
@@ -143,12 +143,13 @@ export function CalendarView({ onOpenTask }: { onOpenTask: (t: Task) => void }) 
               month={month}
               tasks={byDay.get(toISODate(day)) ?? []}
               events={gEvents[toISODate(day)] ?? []}
+              projColor={projColor}
               onOpenTask={onOpenTask}
             />
           ))}
         </div>
         <DragOverlay dropAnimation={null}>
-          {active ? <Chip task={active} overlay /> : null}
+          {active ? <Chip task={active} color={projColor.get(active.projectId)} overlay /> : null}
         </DragOverlay>
       </DndContext>
     </div>
@@ -160,12 +161,14 @@ function DayCell({
   month,
   tasks,
   events,
+  projColor,
   onOpenTask,
 }: {
   day: Date;
   month: Date;
   tasks: Task[];
   events: GEvent[];
+  projColor: Map<string, string>;
   onOpenTask: (t: Task) => void;
 }) {
   const iso = toISODate(day);
@@ -196,7 +199,7 @@ function DayCell({
       </div>
       <div className="space-y-1 overflow-hidden">
         {shownTasks.map((t) => (
-          <Chip key={t.id} task={t} onOpen={() => onOpenTask(t)} />
+          <Chip key={t.id} task={t} color={projColor.get(t.projectId)} onOpen={() => onOpenTask(t)} />
         ))}
         {shownEvents.map((e) => (
           <GChip key={e.id} event={e} />
@@ -221,15 +224,25 @@ function GChip({ event }: { event: GEvent }) {
   );
 }
 
-function Chip({ task, onOpen, overlay }: { task: Task; onOpen?: () => void; overlay?: boolean }) {
+function Chip({
+  task,
+  color,
+  onOpen,
+  overlay,
+}: {
+  task: Task;
+  color?: string;
+  onOpen?: () => void;
+  overlay?: boolean;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
-  const meta = statusMeta(task.status);
   return (
     <div
       ref={overlay ? undefined : setNodeRef}
       {...(overlay ? {} : attributes)}
       {...(overlay ? {} : listeners)}
       onClick={onOpen}
+      title={task.title}
       className={cn(
         "flex cursor-pointer items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 text-2xs text-text",
         overlay ? "shadow-pop" : "hover:border-border-strong",
@@ -237,7 +250,10 @@ function Chip({ task, onOpen, overlay }: { task: Task; onOpen?: () => void; over
         task.status === "done" && "text-text-faint line-through"
       )}
     >
-      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", meta.dot)} />
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ background: color ?? "rgb(var(--text-faint))" }}
+      />
       {task.dueTime && <span className="mono shrink-0 opacity-70">{task.dueTime}</span>}
       <span className="truncate">{task.title}</span>
     </div>

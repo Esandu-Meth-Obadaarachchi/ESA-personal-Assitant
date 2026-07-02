@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import type { Project, Task, Workspace } from "@/lib/types";
 import {
   seedNewUser,
+  watchAllTasks,
   watchProjects,
   watchTasks,
   watchWorkspaces,
@@ -21,6 +22,8 @@ interface WorkspaceState {
   workspaces: Workspace[];
   projects: Project[];
   tasks: Task[];
+  /** Every task in the current workspace across all its projects. */
+  workspaceTasks: Task[];
   currentWorkspace: Workspace | null;
   currentProject: Project | null;
   loading: boolean;
@@ -48,6 +51,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
+  const [allUserTasks, setAllUserTasks] = useState<Task[]>([]);
 
   // 1. Watch workspaces; seed a new user exactly once.
   useEffect(() => {
@@ -124,6 +128,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, [currentProjectId]);
 
+  // Watch every task the user can see; the calendar + overview use the
+  // workspace-wide slice (all projects), not just the selected project.
+  useEffect(() => {
+    if (!user) {
+      setAllUserTasks([]);
+      return;
+    }
+    return watchAllTasks(user.uid, setAllUserTasks);
+  }, [user]);
+
+  const workspaceTasks = useMemo(
+    () => allUserTasks.filter((t) => t.workspaceId === currentWorkspaceId),
+    [allUserTasks, currentWorkspaceId]
+  );
+
   const value = useMemo<WorkspaceState>(() => {
     const currentWorkspace = workspaces.find((w) => w.id === currentWorkspaceId) ?? null;
     const currentProject = projects.find((p) => p.id === currentProjectId) ?? null;
@@ -131,6 +150,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       workspaces,
       projects,
       tasks,
+      workspaceTasks,
       currentWorkspace,
       currentProject,
       loading: !wsLoaded,
@@ -142,7 +162,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       },
       selectProject: setCurrentProjectId,
     };
-  }, [workspaces, projects, tasks, currentWorkspaceId, currentProjectId, wsLoaded, seeding, tasksLoading]);
+  }, [workspaces, projects, tasks, workspaceTasks, currentWorkspaceId, currentProjectId, wsLoaded, seeding, tasksLoading]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
