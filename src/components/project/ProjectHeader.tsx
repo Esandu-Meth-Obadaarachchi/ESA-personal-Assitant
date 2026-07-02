@@ -1,10 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { CalendarDays, KanbanSquare, ListTree, Rows3, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { CalendarDays, Clock, Download, FileText, KanbanSquare, ListTree, Rows3, Sparkles } from "lucide-react";
 import type { Project, Task } from "@/lib/types";
 import { dueState } from "@/lib/date";
+import { exportTimeCSV } from "@/lib/export";
 import { Button } from "@/components/ui/Button";
+import { Dropdown, MenuItem } from "@/components/ui/Dropdown";
+import { PrintView } from "./PrintView";
 import { cn } from "@/lib/utils";
 
 export type ViewTab = "tree" | "board" | "list" | "calendar";
@@ -28,6 +32,7 @@ export function ProjectHeader({
   onTab: (t: ViewTab) => void;
 }) {
   const router = useRouter();
+  const [printing, setPrinting] = useState(false);
   const open = tasks.filter((t) => t.status !== "done").length;
   const overdue = tasks.filter(
     (t) => t.status !== "done" && dueState(t.dueDate, t.status) === "overdue"
@@ -51,11 +56,45 @@ export function ProjectHeader({
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          <Dropdown
+            align="right"
+            width={188}
+            trigger={() => (
+              <span className="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[13px] text-text-muted hover:bg-surface-2 hover:text-text">
+                <Download className="h-3.5 w-3.5" /> Export
+              </span>
+            )}
+          >
+            {(close) => (
+              <div>
+                <MenuItem
+                  icon={<FileText className="h-4 w-4" />}
+                  onClick={() => {
+                    setPrinting(true);
+                    close();
+                  }}
+                >
+                  Print / PDF
+                </MenuItem>
+                <MenuItem
+                  icon={<Clock className="h-4 w-4" />}
+                  onClick={() => {
+                    exportTimeCSV(project.name, tasks);
+                    close();
+                  }}
+                >
+                  Time report (CSV)
+                </MenuItem>
+              </div>
+            )}
+          </Dropdown>
           <Button variant="outline" size="sm" onClick={() => router.push("/agent")}>
             <Sparkles className="h-3.5 w-3.5 text-accent" /> Ask the brain
           </Button>
         </div>
       </div>
+
+      {printing && <PrintView project={project} tasks={tasks} onClose={() => setPrinting(false)} />}
 
       {/* tab switcher */}
       <div className="flex items-center gap-0.5">

@@ -155,6 +155,21 @@ body {
   }
 }
 
+/* Print: show only the export sheet, hide all app chrome. */
+@media print {
+  body > *:not(.print-root) {
+    display: none !important;
+  }
+  .print-root {
+    position: static !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  @page {
+    margin: 14mm;
+  }
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;

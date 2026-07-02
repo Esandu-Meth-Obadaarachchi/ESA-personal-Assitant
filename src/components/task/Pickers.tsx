@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, Plus, X } from "lucide-react";
+import { CalendarClock, Plus, Repeat, X } from "lucide-react";
 import { PRIORITIES } from "@/lib/constants";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { toISODate, todayISO } from "@/lib/date";
-import type { TaskPriority, TaskStatus } from "@/lib/types";
+import type { Recurrence, RecurrenceFreq, TaskPriority, TaskStatus } from "@/lib/types";
 import { Avatar, AvatarEmpty } from "@/components/ui/Avatar";
 import { Dropdown, MenuItem } from "@/components/ui/Dropdown";
 import { DueDateChip } from "@/components/ui/DueDateChip";
@@ -186,6 +186,58 @@ export function DuePicker({
           )}
         </div>
       )}
+    </Dropdown>
+  );
+}
+
+const RECUR_LABEL: Record<RecurrenceFreq, string> = {
+  daily: "Every day",
+  weekly: "Every week",
+  monthly: "Every month",
+};
+
+export function RecurrencePicker({
+  value,
+  onChange,
+}: {
+  value?: Recurrence | null;
+  onChange: (r: Recurrence | null) => void;
+}) {
+  const options: (Recurrence | null)[] = [
+    null,
+    { freq: "daily", interval: 1 },
+    { freq: "weekly", interval: 1 },
+    { freq: "monthly", interval: 1 },
+  ];
+  return (
+    <Dropdown
+      width={176}
+      trigger={() => (
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-2xs",
+            value ? "text-accent" : "text-text-faint hover:text-text-muted"
+          )}
+        >
+          <Repeat className="h-3.5 w-3.5" />
+          {value ? RECUR_LABEL[value.freq] : "Does not repeat"}
+        </span>
+      )}
+    >
+      {(close) =>
+        options.map((o) => (
+          <MenuItem
+            key={o?.freq ?? "none"}
+            active={(o?.freq ?? null) === (value?.freq ?? null)}
+            onClick={() => {
+              onChange(o);
+              close();
+            }}
+          >
+            {o ? RECUR_LABEL[o.freq] : "Does not repeat"}
+          </MenuItem>
+        ))
+      }
     </Dropdown>
   );
 }

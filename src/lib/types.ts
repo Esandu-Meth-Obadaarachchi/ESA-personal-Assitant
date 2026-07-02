@@ -50,6 +50,25 @@ export interface LinkedDoc {
   score?: number;
 }
 
+export type RecurrenceFreq = "daily" | "weekly" | "monthly";
+
+export interface Recurrence {
+  freq: RecurrenceFreq;
+  /** every N units (1 = every day/week/month). */
+  interval: number;
+}
+
+export interface TimeEntry {
+  id: string;
+  /** epoch ms when the timer started. */
+  start: number;
+  /** epoch ms when it stopped; null while running. */
+  end: number | null;
+  /** cached duration in seconds once stopped (also used for manual entries). */
+  seconds: number;
+  note?: string;
+}
+
 export interface Task {
   id: string;
   workspaceId: string;
@@ -76,6 +95,12 @@ export interface Task {
   updatedAt: number;
   createdBy: string;
   collapsed?: boolean;
+  /** Repeat rule; when done, the next occurrence is spawned. */
+  recurrence?: Recurrence | null;
+  /** Time tracking log. */
+  timeEntries?: TimeEntry[];
+  /** Linked Google Calendar event id (when calendar sync is on). */
+  googleEventId?: string | null;
 }
 
 /** Task augmented with its resolved children — built client-side from a flat list. */

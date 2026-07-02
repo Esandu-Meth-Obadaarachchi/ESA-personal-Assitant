@@ -11,8 +11,9 @@ import { relativeTime } from "@/lib/date";
 import { shortId } from "@/lib/utils";
 import { StatusControl } from "@/components/ui/StatusControl";
 import { Button } from "@/components/ui/Button";
-import { AssigneePicker, DuePicker, PrioritySelect, TagEditor } from "@/components/task/Pickers";
+import { AssigneePicker, DuePicker, PrioritySelect, RecurrencePicker, TagEditor } from "@/components/task/Pickers";
 import { QuickAdd } from "@/components/task/TaskRow";
+import { TimeTracker } from "@/components/task/TimeTracker";
 
 export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () => void }) {
   const { tasks } = useWorkspace();
@@ -111,9 +112,17 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
                 onChange={(d) => actions.setDue(live.id, d)}
               />
             </Prop>
+            <Prop label="Repeat">
+              <RecurrencePicker value={live.recurrence} onChange={(r) => actions.setRecurrence(live.id, r)} />
+            </Prop>
             <Prop label="Tags">
               <TagEditor tags={live.tags} onChange={(t) => actions.setTags(live.id, t)} />
             </Prop>
+          </div>
+
+          {/* time tracking */}
+          <div className="mt-5">
+            <TimeTracker task={live} actions={actions} />
           </div>
 
           {/* notes */}
