@@ -14,11 +14,13 @@ const styles: Record<string, string> = {
 
 export function DueDateChip({
   date,
+  time,
   status,
   className,
   icon = true,
 }: {
   date?: string | null;
+  time?: string | null;
   status?: TaskStatus;
   className?: string;
   icon?: boolean;
@@ -35,6 +37,7 @@ export function DueDateChip({
     >
       {icon && <CalendarClock className="h-3 w-3" strokeWidth={2} />}
       {dueLabel(date)}
+      {time && <span className="mono opacity-90">{time}</span>}
     </span>
   );
 }

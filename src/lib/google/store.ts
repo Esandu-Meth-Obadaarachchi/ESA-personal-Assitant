@@ -13,6 +13,7 @@ export interface CalendarConnection {
   channelId?: string | null;
   resourceId?: string | null;
   channelExpiration?: number | null;
+  timeZone?: string | null;
   connectedAt: number;
 }
 

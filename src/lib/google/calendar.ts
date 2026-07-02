@@ -84,32 +84,63 @@ async function calFetch(accessToken: string, path: string, init: RequestInit = {
   return res;
 }
 
-/** All-day event body for a task. Google all-day end.date is exclusive (+1 day). */
-export function taskToEvent(task: Task) {
-  const end = new Date(task.dueDate as string);
-  end.setDate(end.getDate() + 1);
-  return {
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** Event body for a task. Timed (start.dateTime + timeZone) when the task has a
+ *  dueTime, otherwise an all-day event (end.date is exclusive, +1 day). */
+export function taskToEvent(task: Task, timeZone?: string) {
+  const base = {
     summary: task.title,
     description: task.notes || "",
+    extendedProperties: { private: { sbTaskId: task.id } },
+  };
+
+  if (task.dueTime && timeZone) {
+    const [h, m] = task.dueTime.split(":").map(Number);
+    let endH = h + 1;
+    let endDate = task.dueDate as string;
+    if (endH >= 24) {
+      endH -= 24;
+      const d = new Date(`${task.dueDate}T00:00:00`);
+      d.setDate(d.getDate() + 1);
+      endDate = d.toISOString().slice(0, 10);
+    }
+    return {
+      ...base,
+      start: { dateTime: `${task.dueDate}T${pad(h)}:${pad(m)}:00`, timeZone },
+      end: { dateTime: `${endDate}T${pad(endH)}:${pad(m)}:00`, timeZone },
+    };
+  }
+
+  const end = new Date(`${task.dueDate}T00:00:00`);
+  end.setDate(end.getDate() + 1);
+  return {
+    ...base,
     start: { date: task.dueDate },
     end: { date: end.toISOString().slice(0, 10) },
-    extendedProperties: { private: { sbTaskId: task.id } },
   };
 }
 
-export async function createEvent(accessToken: string, task: Task): Promise<string> {
+/** The primary calendar's timezone (needed for timed events). */
+export async function getCalendarTimeZone(accessToken: string): Promise<string | null> {
+  const res = await calFetch(accessToken, `/calendars/primary`);
+  if (!res.ok) return null;
+  return ((await res.json()) as { timeZone?: string }).timeZone ?? null;
+}
+
+export async function createEvent(accessToken: string, task: Task, timeZone?: string): Promise<string> {
   const res = await calFetch(accessToken, `/calendars/primary/events`, {
     method: "POST",
-    body: JSON.stringify(taskToEvent(task)),
+    body: JSON.stringify(taskToEvent(task, timeZone)),
   });
   if (!res.ok) throw new Error(`createEvent failed: ${await res.text()}`);
   return ((await res.json()) as { id: string }).id;
 }
 
-export async function updateEvent(accessToken: string, eventId: string, task: Task) {
+export async function updateEvent(accessToken: string, eventId: string, task: Task, timeZone?: string) {
   const res = await calFetch(accessToken, `/calendars/primary/events/${eventId}`, {
     method: "PATCH",
-    body: JSON.stringify(taskToEvent(task)),
+    body: JSON.stringify(taskToEvent(task, timeZone)),
   });
   // 404/410 => event was deleted in Google; caller should recreate
   if (res.status === 404 || res.status === 410) return false;
