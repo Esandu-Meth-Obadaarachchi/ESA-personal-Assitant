@@ -38,5 +38,12 @@ service cloud.firestore {
       allow create: if isMember(request.resource.data);
       allow update, delete: if isMember(resource.data);
     }
+
+    // Per-project whiteboard scenes. memberIds mirrors the project's members.
+    match /whiteboards/{id} {
+      allow read: if isMember(resource.data);
+      allow create: if isMember(request.resource.data);
+      allow update, delete: if isMember(resource.data);
+    }
   }
 }

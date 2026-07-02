@@ -14,7 +14,7 @@ import {
 import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase/client";
 import { PROJECT_COLORS } from "@/lib/constants";
-import type { DayPlan, Project, Task, Workspace, WorkspaceMember } from "@/lib/types";
+import type { DayPlan, Project, Task, Whiteboard, Workspace, WorkspaceMember } from "@/lib/types";
 import { slugifyNamespace } from "./tree";
 
 /**
@@ -349,6 +349,29 @@ export async function saveDayPlan(uid: string, date: string, content: string) {
     updatedAt: Date.now(),
     memberIds: [uid],
   } satisfies Omit<DayPlan, "id">);
+}
+
+/* ------------------------------ whiteboard ------------------------------ */
+
+/** Live-watch a project's whiteboard scene (JSON string, or null if empty). */
+export function watchWhiteboard(projectId: string, cb: (scene: string | null) => void): Unsubscribe {
+  const ref = doc(requireDb(), "whiteboards", projectId);
+  return onSnapshot(
+    ref,
+    (snap) => cb(((snap.data() as Whiteboard | undefined)?.scene) ?? null),
+    (err) => console.error("watchWhiteboard error", err)
+  );
+}
+
+/** Upsert a project's whiteboard scene. */
+export async function saveWhiteboard(projectId: string, memberIds: string[], scene: string) {
+  const ref = doc(requireDb(), "whiteboards", projectId);
+  await setDoc(ref, {
+    projectId,
+    scene,
+    memberIds,
+    updatedAt: Date.now(),
+  } satisfies Omit<Whiteboard, "id">);
 }
 
 /* ------------------------------ first-run seed ------------------------------ */
