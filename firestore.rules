@@ -33,15 +33,21 @@ service cloud.firestore {
     }
 
     // Per-user daily planner notes. memberIds is always the single owner uid.
+    // A not-yet-created doc has a null `resource`, so allow signed-in reads of
+    // the empty state (there is nothing to leak) and gate everything else on
+    // membership. Ordering matters: the null check short-circuits before
+    // isMember touches resource.data.
     match /dayPlans/{id} {
-      allow read: if isMember(resource.data);
+      allow read: if (resource == null && signedIn()) || isMember(resource.data);
       allow create: if isMember(request.resource.data);
       allow update, delete: if isMember(resource.data);
     }
 
     // Per-project whiteboard scenes. memberIds mirrors the project's members.
+    // Same null-resource handling so a project with no saved scene can load an
+    // empty canvas instead of hanging on a permission error.
     match /whiteboards/{id} {
-      allow read: if isMember(resource.data);
+      allow read: if (resource == null && signedIn()) || isMember(resource.data);
       allow create: if isMember(request.resource.data);
       allow update, delete: if isMember(resource.data);
     }

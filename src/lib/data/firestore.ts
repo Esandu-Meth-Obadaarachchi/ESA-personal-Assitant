@@ -366,7 +366,11 @@ export function watchWhiteboard(projectId: string, cb: (scene: string | null) =>
   return onSnapshot(
     ref,
     (snap) => cb(((snap.data() as Whiteboard | undefined)?.scene) ?? null),
-    (err) => console.error("watchWhiteboard error", err)
+    (err) => {
+      // Never leave the canvas hanging on a read error — fall back to empty.
+      console.error("watchWhiteboard error", err);
+      cb(null);
+    }
   );
 }
 
