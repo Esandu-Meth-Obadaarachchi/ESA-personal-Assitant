@@ -89,14 +89,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   // 3. Watch projects of the current workspace.
   useEffect(() => {
-    if (!currentWorkspaceId) {
+    if (!currentWorkspaceId || !user) {
       setProjects([]);
       return;
     }
     if (typeof window !== "undefined") localStorage.setItem(LS_WS, currentWorkspaceId);
-    const unsub = watchProjects(currentWorkspaceId, setProjects);
+    const unsub = watchProjects(user.uid, currentWorkspaceId, setProjects);
     return () => unsub();
-  }, [currentWorkspaceId]);
+  }, [currentWorkspaceId, user]);
 
   // 4. Keep the selected project valid within the current workspace.
   useEffect(() => {
@@ -110,14 +110,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   // 5. Watch tasks of the current project.
   useEffect(() => {
-    if (!currentProjectId) {
+    if (!currentProjectId || !user) {
       setTasks([]);
       setTasksLoading(false);
       return;
     }
     if (typeof window !== "undefined") localStorage.setItem(LS_PROJ, currentProjectId);
     setTasksLoading(true);
-    const unsub = watchTasks(currentProjectId, (t) => {
+    const unsub = watchTasks(user.uid, currentProjectId, (t) => {
       setTasks(t);
       setTasksLoading(false);
     });

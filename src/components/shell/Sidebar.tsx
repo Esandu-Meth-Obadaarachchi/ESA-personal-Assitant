@@ -11,10 +11,12 @@ import {
   Plus,
   Sparkles,
   Sun,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
-import { createProject } from "@/lib/data/firestore";
+import { createProject, deleteProjectDeep } from "@/lib/data/firestore";
+import type { Project } from "@/lib/types";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -34,6 +36,18 @@ export function Sidebar() {
   const [pName, setPName] = useState("");
   const [pDesc, setPDesc] = useState("");
   const [busy, setBusy] = useState(false);
+  const [projToDelete, setProjToDelete] = useState<Project | null>(null);
+
+  const confirmDeleteProject = async () => {
+    if (!user || !projToDelete) return;
+    setBusy(true);
+    try {
+      await deleteProjectDeep(user.uid, projToDelete.id);
+      setProjToDelete(null);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const createProj = async () => {
     if (!currentWorkspace || !pName.trim()) return;
@@ -97,20 +111,31 @@ export function Sidebar() {
           {projects.map((p) => {
             const active = p.id === currentProject?.id && pathname === "/";
             return (
-              <button
+              <div
                 key={p.id}
-                onClick={() => openProject(p.id)}
                 className={cn(
-                  "group flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+                  "group flex items-center rounded-md pr-1 transition-colors",
                   active ? "bg-surface-2 text-text" : "text-text-muted hover:bg-surface-2 hover:text-text"
                 )}
               >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-[3px]"
-                  style={{ background: p.color }}
-                />
-                <span className="flex-1 truncate">{p.name}</span>
-              </button>
+                <button
+                  onClick={() => openProject(p.id)}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left text-[13px]"
+                >
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: p.color }} />
+                  <span className="flex-1 truncate">{p.name}</span>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setProjToDelete(p);
+                  }}
+                  title="Delete project"
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded text-text-faint opacity-0 transition-opacity hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             );
           })}
           {projects.length === 0 && (
@@ -197,6 +222,21 @@ export function Sidebar() {
           </Button>
           <Button variant="primary" onClick={createProj} disabled={!pName.trim() || busy}>
             {busy ? "Creating…" : "Create project"}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!projToDelete} onClose={() => setProjToDelete(null)} title="Delete project">
+        <p className="text-[13px] leading-relaxed text-text-muted">
+          Delete <span className="font-medium text-text">{projToDelete?.name}</span> and all of its
+          tasks? This cannot be undone.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setProjToDelete(null)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteProject} disabled={busy}>
+            {busy ? "Deleting…" : "Delete project"}
           </Button>
         </div>
       </Modal>

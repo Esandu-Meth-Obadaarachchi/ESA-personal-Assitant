@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDocs,
   onSnapshot,
   query,
   updateDoc,
@@ -39,21 +40,42 @@ export function watchWorkspaces(uid: string, cb: (ws: Workspace[]) => void): Uns
   });
 }
 
-export function watchProjects(workspaceId: string, cb: (p: Project[]) => void): Unsubscribe {
-  const q = query(collection(requireDb(), "projects"), where("workspaceId", "==", workspaceId));
-  return onSnapshot(q, (snap) => {
-    const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Project, "id">) }));
-    rows.sort((a, b) => a.createdAt - b.createdAt);
-    cb(rows);
-  });
+// NOTE: Firestore "rules are not filters" — a list query must itself be
+// constrained to what the rules allow. Our rules gate on `memberIds`, so every
+// listener filters by `memberIds array-contains uid` (matching the workspaces
+// query) and narrows by workspace/project client-side. Filtering by
+// workspaceId/projectId alone returns 403 PERMISSION_DENIED.
+export function watchProjects(
+  uid: string,
+  workspaceId: string,
+  cb: (p: Project[]) => void
+): Unsubscribe {
+  const q = query(collection(requireDb(), "projects"), where("memberIds", "array-contains", uid));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const rows = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<Project, "id">) }))
+        .filter((p) => p.workspaceId === workspaceId);
+      rows.sort((a, b) => a.createdAt - b.createdAt);
+      cb(rows);
+    },
+    (err) => console.error("watchProjects error", err)
+  );
 }
 
-export function watchTasks(projectId: string, cb: (t: Task[]) => void): Unsubscribe {
-  const q = query(collection(requireDb(), "tasks"), where("projectId", "==", projectId));
-  return onSnapshot(q, (snap) => {
-    const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Task, "id">) }));
-    cb(rows);
-  });
+export function watchTasks(uid: string, projectId: string, cb: (t: Task[]) => void): Unsubscribe {
+  const q = query(collection(requireDb(), "tasks"), where("memberIds", "array-contains", uid));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const rows = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<Task, "id">) }))
+        .filter((t) => t.projectId === projectId);
+      cb(rows);
+    },
+    (err) => console.error("watchTasks error", err)
+  );
 }
 
 /** Every task the user can see — powers the cross-project daily standup. */
@@ -112,11 +134,53 @@ export async function updateProject(id: string, patch: Partial<Project>) {
   await updateDoc(doc(requireDb(), "projects", id), patch);
 }
 
+/**
+ * Delete a workspace and everything under it (projects + tasks). Queries by
+ * `memberIds` (the only rule-satisfying list filter), narrows by workspace, then
+ * batch-deletes in chunks of 400 to stay under the 500-op batch limit.
+ */
+export async function deleteWorkspace(uid: string, workspaceId: string) {
+  const database = requireDb();
+  const [projSnap, taskSnap] = await Promise.all([
+    getDocs(query(collection(database, "projects"), where("memberIds", "array-contains", uid))),
+    getDocs(query(collection(database, "tasks"), where("memberIds", "array-contains", uid))),
+  ]);
+
+  const refs = [
+    ...projSnap.docs.filter((d) => d.data().workspaceId === workspaceId).map((d) => d.ref),
+    ...taskSnap.docs.filter((d) => d.data().workspaceId === workspaceId).map((d) => d.ref),
+    doc(database, "workspaces", workspaceId),
+  ];
+
+  for (let i = 0; i < refs.length; i += 400) {
+    const batch = writeBatch(database);
+    refs.slice(i, i + 400).forEach((ref) => batch.delete(ref));
+    await batch.commit();
+  }
+}
+
 export async function deleteProject(id: string, tasks: Task[]) {
   const batch = writeBatch(requireDb());
   tasks.filter((t) => t.projectId === id).forEach((t) => batch.delete(doc(requireDb(), "tasks", t.id)));
   batch.delete(doc(requireDb(), "projects", id));
   await batch.commit();
+}
+
+/** Delete a project + all its tasks, fetching the tasks itself (works for any project). */
+export async function deleteProjectDeep(uid: string, projectId: string) {
+  const database = requireDb();
+  const taskSnap = await getDocs(
+    query(collection(database, "tasks"), where("memberIds", "array-contains", uid))
+  );
+  const refs = [
+    ...taskSnap.docs.filter((d) => d.data().projectId === projectId).map((d) => d.ref),
+    doc(database, "projects", projectId),
+  ];
+  for (let i = 0; i < refs.length; i += 400) {
+    const batch = writeBatch(database);
+    refs.slice(i, i + 400).forEach((ref) => batch.delete(ref));
+    await batch.commit();
+  }
 }
 
 /* ------------------------------ tasks ------------------------------ */

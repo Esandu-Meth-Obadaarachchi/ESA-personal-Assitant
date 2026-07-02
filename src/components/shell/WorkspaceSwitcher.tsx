@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
-import { createWorkspace } from "@/lib/data/firestore";
+import { createWorkspace, deleteWorkspace } from "@/lib/data/firestore";
+import type { Workspace } from "@/lib/types";
 import { WORKSPACE_EMOJIS } from "@/lib/constants";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Modal, Field, inputClass } from "@/components/ui/Modal";
@@ -18,6 +19,18 @@ export function WorkspaceSwitcher() {
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState(WORKSPACE_EMOJIS[0]);
   const [busy, setBusy] = useState(false);
+  const [toDelete, setToDelete] = useState<Workspace | null>(null);
+
+  const confirmDelete = async () => {
+    if (!user || !toDelete) return;
+    setBusy(true);
+    try {
+      await deleteWorkspace(user.uid, toDelete.id);
+      setToDelete(null);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async () => {
     if (!user || !name.trim()) return;
@@ -60,23 +73,38 @@ export function WorkspaceSwitcher() {
               Workspaces
             </div>
             {workspaces.map((w) => (
-              <button
+              <div
                 key={w.id}
-                onClick={() => {
-                  selectWorkspace(w.id);
-                  close();
-                }}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-surface-2",
+                  "group flex items-center rounded-md pr-1 transition-colors hover:bg-surface-2",
                   w.id === currentWorkspace?.id && "bg-surface-2"
                 )}
               >
-                <span className="grid h-6 w-6 place-items-center rounded-md bg-surface text-sm">
-                  {w.emoji}
-                </span>
-                <span className="flex-1 truncate text-text">{w.name}</span>
-                {w.id === currentWorkspace?.id && <Check className="h-3.5 w-3.5 text-accent" />}
-              </button>
+                <button
+                  onClick={() => {
+                    selectWorkspace(w.id);
+                    close();
+                  }}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left text-[13px]"
+                >
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-surface text-sm">
+                    {w.emoji}
+                  </span>
+                  <span className="flex-1 truncate text-text">{w.name}</span>
+                  {w.id === currentWorkspace?.id && <Check className="h-3.5 w-3.5 shrink-0 text-accent" />}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setToDelete(w);
+                    close();
+                  }}
+                  title="Delete workspace"
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded text-text-faint opacity-0 transition-opacity hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ))}
             <div className="my-1 h-px bg-border" />
             <button
@@ -128,6 +156,21 @@ export function WorkspaceSwitcher() {
           </Button>
           <Button variant="primary" onClick={submit} disabled={!name.trim() || busy}>
             {busy ? "Creating…" : "Create workspace"}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!toDelete} onClose={() => setToDelete(null)} title="Delete workspace">
+        <p className="text-[13px] leading-relaxed text-text-muted">
+          Delete <span className="font-medium text-text">{toDelete?.emoji} {toDelete?.name}</span> and
+          all of its projects and tasks? This cannot be undone.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setToDelete(null)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={confirmDelete} disabled={busy}>
+            {busy ? "Deleting…" : "Delete workspace"}
           </Button>
         </div>
       </Modal>
