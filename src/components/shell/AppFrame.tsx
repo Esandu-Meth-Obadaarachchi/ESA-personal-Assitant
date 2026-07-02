@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu } from "lucide-react";
+import { Menu, PanelLeftOpen } from "lucide-react";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { Logo } from "@/components/ui/Logo";
 import { Sidebar } from "./Sidebar";
@@ -10,7 +10,19 @@ import { Sidebar } from "./Sidebar";
 export function AppFrame({ children }: { children: React.ReactNode }) {
   const { seeding, currentWorkspace } = useWorkspace();
   const [navOpen, setNavOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+
+  // Restore the desktop collapse preference.
+  useEffect(() => {
+    setCollapsed(localStorage.getItem("sb-nav-collapsed") === "1");
+  }, []);
+  const toggleCollapse = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      localStorage.setItem("sb-nav-collapsed", next ? "1" : "0");
+      return next;
+    });
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => {
@@ -42,7 +54,24 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      <Sidebar navOpen={navOpen} onNavClose={() => setNavOpen(false)} />
+      <Sidebar
+        navOpen={navOpen}
+        onNavClose={() => setNavOpen(false)}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapse}
+      />
+
+      {/* Reopen affordance when the desktop sidebar is collapsed. */}
+      {collapsed && (
+        <button
+          onClick={toggleCollapse}
+          aria-label="Open sidebar"
+          title="Open sidebar"
+          className="fixed left-2 top-2 z-30 hidden h-8 w-8 place-items-center rounded-md border border-border bg-surface/80 text-text-muted backdrop-blur transition-colors hover:bg-surface-2 hover:text-text lg:grid"
+        >
+          <PanelLeftOpen className="h-4 w-4" />
+        </button>
+      )}
 
       <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
 

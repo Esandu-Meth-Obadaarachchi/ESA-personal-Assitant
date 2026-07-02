@@ -81,6 +81,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: text }, { status: err.status });
     }
     console.error("share error", err);
-    return NextResponse.json({ error: "Failed" }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

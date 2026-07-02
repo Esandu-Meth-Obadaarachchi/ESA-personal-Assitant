@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 /**
  * Minimal, dependency-free popover menu. Anchors a floating panel to a trigger,
- * closes on outside-click and Escape. Good enough for status/priority/assignee
- * pickers and row overflow menus without pulling in a headless-ui dependency.
+ * closes on outside-click and Escape.
+ *
+ * The panel renders in a portal on document.body with `position: fixed`, so it
+ * is never clipped by an ancestor's `overflow` (e.g. the task drawer) and it
+ * flips above the trigger when there isn't room below (e.g. the sidebar footer
+ * user menu). Position is measured from the trigger's rect and clamped to the
+ * viewport.
  */
 export function Dropdown({
   trigger,
@@ -22,12 +28,47 @@ export function Dropdown({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+
+  // Position the panel from the trigger rect; re-run on scroll/resize.
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    const place = () => {
+      const t = triggerRef.current?.getBoundingClientRect();
+      if (!t) return;
+      const margin = 8;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let left = align === "right" ? t.right - width : t.left;
+      left = Math.max(margin, Math.min(left, vw - width - margin));
+      const popH = popRef.current?.offsetHeight ?? 0;
+      const below = t.bottom + 6;
+      // Flip above the trigger if the panel would run off the bottom.
+      const flip = popH > 0 && below + popH > vh - margin && t.top - 6 - popH > margin;
+      setPos({ top: flip ? t.top - 6 - popH : below, left });
+    };
+    place();
+    const raf = requestAnimationFrame(place); // re-place once height is known
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open, align, width]);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || popRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onDown);
@@ -39,8 +80,9 @@ export function Dropdown({
   }, [open]);
 
   return (
-    <div ref={ref} className="relative inline-flex">
+    <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={(e) => {
           e.stopPropagation();
@@ -50,20 +92,29 @@ export function Dropdown({
       >
         {trigger(open)}
       </button>
-      {open && (
-        <div
-          className={cn(
-            "glass absolute top-[calc(100%+6px)] z-50 origin-top animate-scale-in overflow-hidden rounded-lg p-1 shadow-pop",
-            align === "right" ? "right-0" : "left-0",
-            className
-          )}
-          style={{ width, minWidth: width }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {children(() => setOpen(false))}
-        </div>
-      )}
-    </div>
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={popRef}
+            className={cn(
+              "glass fixed z-[110] origin-top animate-scale-in overflow-hidden rounded-lg p-1 shadow-pop",
+              className
+            )}
+            style={{
+              width,
+              minWidth: width,
+              top: pos?.top ?? -9999,
+              left: pos?.left ?? -9999,
+              visibility: pos ? "visible" : "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {children(() => setOpen(false))}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 
