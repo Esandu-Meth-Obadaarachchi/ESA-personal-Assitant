@@ -8,6 +8,25 @@ export async function authedFetch(input: string, init: RequestInit = {}) {
   return fetch(input, { ...init, headers });
 }
 
+/** Fire-and-forget: push a task's state to Google Calendar. No-ops server-side
+ *  if the user hasn't connected a calendar. Never blocks the UI. */
+export function syncTaskToCalendar(taskId: string) {
+  void authedFetch("/api/calendar/push", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ taskId }),
+  }).catch(() => {});
+}
+
+/** Fire-and-forget: delete a calendar event for a task being removed. */
+export function deleteCalendarEvent(eventId: string) {
+  void authedFetch("/api/calendar/push", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ deleteEventId: eventId }),
+  }).catch(() => {});
+}
+
 /** POST a JSON body with auth; returns parsed JSON or throws with the server message. */
 export async function postJSON<T = unknown>(url: string, body: unknown): Promise<T> {
   const res = await authedFetch(url, {

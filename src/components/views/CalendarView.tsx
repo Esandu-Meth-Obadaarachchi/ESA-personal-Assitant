@@ -24,13 +24,14 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { CalendarCheck2, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { useTaskActions } from "@/lib/data/useTaskActions";
 import { statusMeta } from "@/lib/constants";
 import { toISODate } from "@/lib/date";
 import type { Task } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
+import { CalendarSync } from "@/components/project/CalendarSync";
 import { cn } from "@/lib/utils";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -82,9 +83,9 @@ export function CalendarView({ onOpenTask }: { onOpenTask: (t: Task) => void }) 
         <Button size="sm" variant="subtle" onClick={() => setMonth(new Date())}>
           Today
         </Button>
-        <span className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2 py-1 text-2xs text-text-muted">
-          <CalendarCheck2 className="h-3 w-3 text-ok" /> Synced with Google
-        </span>
+        <div className="ml-auto">
+          <CalendarSync />
+        </div>
       </div>
 
       <div className="grid grid-cols-7 border-b border-border pb-1.5">

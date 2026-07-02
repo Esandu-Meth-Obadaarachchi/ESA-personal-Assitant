@@ -10,16 +10,18 @@ From `second-brain-app-spec.md` §5. This build delivers a solid runnable founda
 | — | Firebase Google auth + per-business workspaces | **Done** |
 | — | Knowledge (Voyage + Pinecone) + agent action tools (Phase 3 pulled forward) | **Done** |
 | — | Daily AI standup + smart linking | **Done** |
-| 2 | Google Calendar two-way sync | Calendar view + drag-to-reschedule done; sync stubbed (indicator only) |
+| 2 | Google Calendar two-way sync | **Done** — OAuth (offline), push task->event, watch-channel + webhook reverse sync, "Sync now". Needs a Google OAuth client + (for live reverse) a public webhook URL. See `docs/CALENDAR.md` |
 | 4 | WhatsApp Cloud API bot | Not started — reuses `runAgent` behind a webhook route |
-| 5 | Roles, templates, time tracking, recurring tasks | Roles modelled (`WorkspaceMember.role`); rest not started |
+| 5 | Time tracking, recurring tasks, templates, roles | **Time tracking + recurring tasks done**; roles modelled (`WorkspaceMember.role`); templates not started |
+| — | Single-page doc export (Phase 1) | **Done** — printable project + task-tree, PDF via print |
 | 6 | Stripe billing + client-viewer portal | Not started |
 
-## What is intentionally stubbed
+## What is intentionally stubbed / not built
 
-- **Google Calendar**: the Calendar view reschedules tasks in Firestore and shows a "Synced with Google" indicator, but there is no OAuth/watch-channel sync yet. Start Google OAuth verification early (sensitive scopes take weeks).
-- **Doc export (Phase 1)**: single-page project + task-tree export to PDF/HTML is speced but not built.
+- **Project templates**: not built.
 - **WhatsApp / Stripe**: need external accounts + approvals; not wired.
+- **RAG / agent** (search, chat, smart-linking, meeting-notes->tasks): built but needs `ANTHROPIC_API_KEY` + `VOYAGE_API_KEY` + `PINECONE_API_KEY`.
+- **Calendar live reverse-sync** works only with a public `CALENDAR_WEBHOOK_URL` (tunnel/deploy); push + manual "Sync now" work on localhost. Publishing the OAuth app beyond test users triggers Google's weeks-long sensitive-scope review.
 
 ## Building the next phases
 

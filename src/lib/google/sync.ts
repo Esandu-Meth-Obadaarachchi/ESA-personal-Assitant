@@ -1,0 +1,128 @@
+import { adminDb } from "@/lib/firebase/admin";
+import type { Task } from "@/lib/types";
+import {
+  createEvent,
+  deleteEvent,
+  getAccessToken,
+  listEvents,
+  updateEvent,
+} from "./calendar";
+import { getConnection, getTask, saveConnection } from "./store";
+
+type TaskDoc = Task & { memberIds?: string[] };
+
+async function patchTask(id: string, patch: Record<string, unknown>) {
+  await adminDb().collection("tasks").doc(id).update({ ...patch, updatedAt: Date.now() });
+}
+
+/** Push a single task's state to Google Calendar (create / update / delete). */
+export async function pushTask(uid: string, taskId: string): Promise<{ status: string }> {
+  const conn = await getConnection(uid);
+  if (!conn) return { status: "not_connected" };
+
+  const task = (await getTask(taskId)) as TaskDoc | null;
+  if (!task) return { status: "no_task" };
+  if (!task.memberIds?.includes(uid)) return { status: "forbidden" };
+
+  const accessToken = await getAccessToken(conn.refreshToken);
+
+  if (task.dueDate) {
+    if (task.googleEventId) {
+      const ok = await updateEvent(accessToken, task.googleEventId, task);
+      if (!ok) {
+        const id = await createEvent(accessToken, task);
+        await patchTask(task.id, { googleEventId: id });
+      }
+      return { status: "updated" };
+    }
+    const id = await createEvent(accessToken, task);
+    await patchTask(task.id, { googleEventId: id });
+    return { status: "created" };
+  }
+
+  // No due date: remove any existing event.
+  if (task.googleEventId) {
+    await deleteEvent(accessToken, task.googleEventId);
+    await patchTask(task.id, { googleEventId: null });
+    return { status: "unscheduled" };
+  }
+  return { status: "noop" };
+}
+
+/** Delete an event directly (used when a task is deleted client-side). */
+export async function deleteTaskEvent(uid: string, eventId: string) {
+  const conn = await getConnection(uid);
+  if (!conn) return;
+  const accessToken = await getAccessToken(conn.refreshToken);
+  await deleteEvent(accessToken, eventId);
+}
+
+/** Push every dated task to Google (used right after connecting, and by Sync now). */
+export async function pushAllForUser(uid: string): Promise<{ status: string; pushed: number }> {
+  const conn = await getConnection(uid);
+  if (!conn) return { status: "not_connected", pushed: 0 };
+  const accessToken = await getAccessToken(conn.refreshToken);
+
+  const snap = await adminDb().collection("tasks").where("memberIds", "array-contains", uid).get();
+  const tasks = snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<TaskDoc, "id">) }))
+    .filter((t) => t.dueDate)
+    .slice(0, 300);
+
+  let pushed = 0;
+  for (const task of tasks) {
+    if (task.googleEventId) {
+      const ok = await updateEvent(accessToken, task.googleEventId, task);
+      if (!ok) {
+        const id = await createEvent(accessToken, task);
+        await patchTask(task.id, { googleEventId: id });
+      }
+    } else {
+      const id = await createEvent(accessToken, task);
+      await patchTask(task.id, { googleEventId: id });
+    }
+    pushed++;
+  }
+  return { status: "ok", pushed };
+}
+
+/** Pull changes from Google into tasks (incremental via syncToken). Only touches
+ *  events we created (they carry sbTaskId), so arbitrary Google events are ignored. */
+export async function pullForUser(uid: string): Promise<{ status: string; changed: number }> {
+  const conn = await getConnection(uid);
+  if (!conn) return { status: "not_connected", changed: 0 };
+  const accessToken = await getAccessToken(conn.refreshToken);
+
+  let { items, nextSyncToken, expired } = await listEvents(accessToken, conn.syncToken ?? undefined);
+  if (expired) ({ items, nextSyncToken } = await listEvents(accessToken));
+
+  let changed = 0;
+  for (const ev of items) {
+    const sbTaskId = ev.extendedProperties?.private?.sbTaskId;
+    if (!sbTaskId) continue;
+    const task = (await getTask(sbTaskId)) as TaskDoc | null;
+    if (!task || !task.memberIds?.includes(uid)) continue;
+
+    if (ev.status === "cancelled") {
+      // Event deleted in Google -> unschedule the task.
+      if (task.dueDate || task.googleEventId) {
+        await patchTask(task.id, { dueDate: null, googleEventId: null });
+        changed++;
+      }
+      continue;
+    }
+
+    const date = ev.start?.date ?? ev.start?.dateTime?.slice(0, 10);
+    const patch: Record<string, unknown> = {};
+    if (date && date !== task.dueDate) patch.dueDate = date;
+    if (ev.summary && ev.summary !== task.title) patch.title = ev.summary;
+    if (task.googleEventId !== ev.id) patch.googleEventId = ev.id;
+    if (Object.keys(patch).length) {
+      await patchTask(task.id, patch);
+      changed++;
+    }
+  }
+
+  if (nextSyncToken) await saveConnection(uid, { syncToken: nextSyncToken });
+  return { status: "ok", changed };
+}

@@ -25,7 +25,7 @@ Full product intent is in `second-brain-app-spec.md` and `second-brain-design-br
 | Vector store | Pinecone | one index, namespace per project |
 | Drag + drop | @dnd-kit | Kanban + Calendar |
 
-Model + RAG rationale: `docs/RAG.md`. Data model: `docs/DATA_MODEL.md`. Visual system: `docs/DESIGN_SYSTEM.md`. Architecture: `docs/ARCHITECTURE.md`. Setup: `docs/SETUP.md`. Roadmap + phase status: `docs/ROADMAP.md`.
+Model + RAG rationale: `docs/RAG.md`. Data model: `docs/DATA_MODEL.md`. Visual system: `docs/DESIGN_SYSTEM.md`. Architecture: `docs/ARCHITECTURE.md`. Setup: `docs/SETUP.md`. Google Calendar sync: `docs/CALENDAR.md`. Roadmap + phase status: `docs/ROADMAP.md`.
 
 ## Live instance (provisioned)
 
@@ -53,6 +53,8 @@ src/
     api/chat/route.ts          Claude agent (POST)
     api/ingest/route.ts        parse -> chunk -> embed -> Pinecone upsert (POST)
     api/related/route.ts       Smart linking: related knowledge for a task (POST)
+    api/calendar/*             Google Calendar OAuth + two-way sync
+                               (connect, callback, status, disconnect, push, sync, webhook)
   components/
     ui/        Design-system primitives (Button, Avatar, Dropdown, Modal, chips...)
     shell/     Sidebar, WorkspaceSwitcher, AppFrame
@@ -67,7 +69,8 @@ src/
     data/      firestore.ts, WorkspaceContext, useTaskActions, tree.ts, standup.ts
     ai/        voyage.ts, pinecone.ts, anthropic.ts, chunker.ts, parse.ts,
                persona.ts, tools.ts, agent.ts, server.ts
-    types.ts, constants.ts, date.ts, utils.ts, api.ts
+    google/    calendar.ts (OAuth + Calendar v3), store.ts (server token store), sync.ts
+    types.ts, constants.ts, date.ts, utils.ts, api.ts, export.ts
 firestore.rules / firestore.indexes.json / firebase.json
 ```
 

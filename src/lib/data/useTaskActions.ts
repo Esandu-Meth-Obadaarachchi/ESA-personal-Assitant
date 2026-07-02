@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "./WorkspaceContext";
 import { createTask, deleteTaskTree, updateTask } from "./firestore";
 import { collectSubtreeIds } from "./tree";
+import { deleteCalendarEvent, syncTaskToCalendar } from "@/lib/api";
 import { toISODate } from "@/lib/date";
 import type { Recurrence, Task, TaskPriority, TaskStatus, TimeEntry } from "@/lib/types";
 
@@ -39,7 +40,7 @@ export function useTaskActions() {
       opts: { parentId?: string | null; status?: TaskStatus; priority?: TaskPriority; dueDate?: string | null } = {}
     ) => {
       if (!ready || !title.trim()) return;
-      return createTask({
+      const id = await createTask({
         workspaceId: currentWorkspace!.id,
         projectId: currentProject!.id,
         parentId: opts.parentId ?? null,
@@ -52,6 +53,8 @@ export function useTaskActions() {
         order: nextOrder(opts.parentId ?? null),
         assignee: user ? { id: user.uid, name: user.displayName ?? "You", avatar: user.photoURL } : null,
       });
+      if (id && opts.dueDate) syncTaskToCalendar(id);
+      return id;
     };
 
     // When a recurring task is completed, spawn its next occurrence.
@@ -81,11 +84,17 @@ export function useTaskActions() {
       ready,
       add,
       addSubtask: (parentId: string, title: string) => add(title, { parentId }),
-      rename: (id: string, title: string) => updateTask(id, { title }),
+      rename: async (id: string, title: string) => {
+        await updateTask(id, { title });
+        syncTaskToCalendar(id);
+      },
       setNotes: (id: string, notes: string) => updateTask(id, { notes }),
       setStatus: applyStatus,
       setPriority: (id: string, priority: TaskPriority) => updateTask(id, { priority }),
-      setDue: (id: string, dueDate: string | null) => updateTask(id, { dueDate }),
+      setDue: async (id: string, dueDate: string | null) => {
+        await updateTask(id, { dueDate });
+        syncTaskToCalendar(id);
+      },
       setTags: (id: string, tags: string[]) => updateTask(id, { tags }),
       setAssignee: (id: string, a: { id: string; name: string; avatar?: string | null } | null) =>
         updateTask(id, {
@@ -94,7 +103,13 @@ export function useTaskActions() {
           assigneeAvatar: a?.avatar ?? null,
         }),
       toggleDone: (t: Task) => applyStatus(t.id, t.status === "done" ? "todo" : "done"),
-      remove: (id: string) => deleteTaskTree(collectSubtreeIds(tasks, id)),
+      remove: (id: string) => {
+        const ids = collectSubtreeIds(tasks, id);
+        tasks
+          .filter((t) => ids.includes(t.id) && t.googleEventId)
+          .forEach((t) => deleteCalendarEvent(t.googleEventId as string));
+        return deleteTaskTree(ids);
+      },
       patch: (id: string, patch: Partial<Task>) => updateTask(id, patch),
 
       // recurrence
