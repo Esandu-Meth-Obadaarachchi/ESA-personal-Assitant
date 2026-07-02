@@ -1,6 +1,6 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, type Firestore } from "firebase/firestore";
 
 const config = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -22,7 +22,23 @@ const app = isFirebaseConfigured
   : null;
 
 export const auth = app ? getAuth(app) : null;
-export const db = app ? getFirestore(app) : null;
+
+/**
+ * Use long-polling auto-detection instead of the default WebChannel transport.
+ * The WebChannel watch-stream aggregator has a known internal-assertion bug
+ * ("Unexpected state (ID: b815/ca9)") that React StrictMode's rapid
+ * subscribe/unsubscribe in dev reliably trips. Long-polling avoids that path.
+ * initializeFirestore can only run once per app, so fall back on HMR re-runs.
+ */
+function makeDb(a: NonNullable<typeof app>): Firestore {
+  try {
+    return initializeFirestore(a, { experimentalAutoDetectLongPolling: true });
+  } catch {
+    return getFirestore(a);
+  }
+}
+
+export const db = app ? makeDb(app) : null;
 
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
