@@ -198,3 +198,19 @@ body {
     animation: shimmer 1.5s infinite;
   }
 }
+
+/* React Flow (mind map) — themed to match the dark/light tokens. */
+.mindmap .react-flow__controls-button {
+  background: rgb(var(--surface));
+  border-bottom: 1px solid rgb(var(--border));
+  color: rgb(var(--text-muted));
+}
+.mindmap .react-flow__controls-button:hover {
+  background: rgb(var(--surface-2));
+}
+.mindmap .react-flow__controls-button svg {
+  fill: currentColor;
+}
+.mindmap .react-flow__attribution {
+  display: none;
+}
