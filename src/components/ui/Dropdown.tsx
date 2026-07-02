@@ -53,7 +53,7 @@ export function Dropdown({
       {open && (
         <div
           className={cn(
-            "glass absolute top-[calc(100%+6px)] z-50 animate-fade-in overflow-hidden rounded-lg p-1 shadow-pop",
+            "glass absolute top-[calc(100%+6px)] z-50 origin-top animate-scale-in overflow-hidden rounded-lg p-1 shadow-pop",
             align === "right" ? "right-0" : "left-0",
             className
           )}

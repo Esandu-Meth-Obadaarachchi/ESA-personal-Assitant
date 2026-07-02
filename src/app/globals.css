@@ -136,6 +136,10 @@ body {
     background: rgb(var(--surface));
     border: 1px solid rgb(var(--border));
     border-radius: 11px;
+    transition:
+      border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   /* Subtle top-lit gradient on hero surfaces */
@@ -179,6 +183,19 @@ body {
     scrollbar-width: none;
   }
 
+  /* Hover lift for interactive cards/buttons. */
+  .lift {
+    transition:
+      transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+  }
+  .lift:active {
+    transform: translateY(0);
+  }
+
   /* Loading shimmer for skeleton states */
   .shimmer {
     position: relative;
@@ -213,4 +230,16 @@ body {
 }
 .mindmap .react-flow__attribution {
   display: none;
+}
+
+/* Respect users who prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
