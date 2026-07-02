@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   BookOpen,
   Hash,
+  Inbox,
   LogOut,
   Moon,
   Plus,
@@ -15,7 +16,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
-import { createProject, deleteProjectDeep } from "@/lib/data/firestore";
+import { createProject, createTask, deleteProjectDeep } from "@/lib/data/firestore";
 import type { Project } from "@/lib/types";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { Avatar } from "@/components/ui/Avatar";
@@ -28,7 +29,8 @@ import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 export function Sidebar() {
   const { user, signOutUser } = useAuth();
   const { theme, toggle } = useTheme();
-  const { projects, currentProject, currentWorkspace, selectProject } = useWorkspace();
+  const { projects, workspaceTasks, currentProject, currentWorkspace, inboxProject, selectProject } =
+    useWorkspace();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -37,6 +39,26 @@ export function Sidebar() {
   const [pDesc, setPDesc] = useState("");
   const [busy, setBusy] = useState(false);
   const [projToDelete, setProjToDelete] = useState<Project | null>(null);
+  const [capture, setCapture] = useState("");
+
+  const realProjects = projects.filter((p) => !p.isInbox);
+  const inboxOpenCount = inboxProject
+    ? workspaceTasks.filter((t) => t.projectId === inboxProject.id && t.status !== "done").length
+    : 0;
+
+  const quickCapture = async () => {
+    const title = capture.trim();
+    if (!title || !user || !currentWorkspace || !inboxProject) return;
+    setCapture("");
+    await createTask({
+      workspaceId: currentWorkspace.id,
+      projectId: inboxProject.id,
+      title,
+      memberIds: currentWorkspace.memberIds,
+      createdBy: user.uid,
+      assignee: { id: user.uid, name: user.displayName ?? "You", avatar: user.photoURL },
+    });
+  };
 
   const confirmDeleteProject = async () => {
     if (!user || !projToDelete) return;
@@ -93,8 +115,43 @@ export function Sidebar() {
         </Link>
       </div>
 
+      {/* Quick capture -> workspace Inbox (add a task without picking a project) */}
+      <div className="mt-2 px-3">
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 transition-colors focus-within:border-accent/40">
+          <Inbox className="h-3.5 w-3.5 shrink-0 text-text-faint" />
+          <input
+            value={capture}
+            onChange={(e) => setCapture(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && quickCapture()}
+            placeholder="Capture a task…"
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-text outline-none placeholder:text-text-faint"
+          />
+        </div>
+      </div>
+
+      {/* Inbox (pinned) */}
+      {inboxProject && (
+        <div className="mt-3 px-3">
+          <button
+            onClick={() => openProject(inboxProject.id)}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+              inboxProject.id === currentProject?.id && pathname === "/"
+                ? "bg-surface-2 text-text"
+                : "text-text-muted hover:bg-surface-2 hover:text-text"
+            )}
+          >
+            <Inbox className="h-4 w-4 shrink-0" />
+            <span className="flex-1 truncate">Inbox</span>
+            {inboxOpenCount > 0 && (
+              <span className="mono text-2xs text-text-faint">{inboxOpenCount}</span>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Projects */}
-      <div className="mt-5 flex min-h-0 flex-1 flex-col px-3">
+      <div className="mt-3 flex min-h-0 flex-1 flex-col px-3">
         <div className="mb-1.5 flex items-center justify-between px-1">
           <span className="text-2xs font-semibold uppercase tracking-wider text-text-faint">
             Projects
@@ -108,7 +165,7 @@ export function Sidebar() {
           </button>
         </div>
         <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto pb-2">
-          {projects.map((p) => {
+          {realProjects.map((p) => {
             const active = p.id === currentProject?.id && pathname === "/";
             return (
               <div
@@ -138,7 +195,7 @@ export function Sidebar() {
               </div>
             );
           })}
-          {projects.length === 0 && (
+          {realProjects.length === 0 && (
             <button
               onClick={() => setNewProj(true)}
               className="flex w-full items-center gap-2 rounded-md border border-dashed border-border px-2 py-2 text-[13px] text-text-faint hover:border-border-strong hover:text-text-muted"
