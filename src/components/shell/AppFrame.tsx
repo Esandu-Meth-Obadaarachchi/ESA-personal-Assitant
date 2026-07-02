@@ -30,7 +30,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
         </button>
         <Logo size={20} />
         <span className="truncate text-[13px] font-medium text-text">
-          {currentWorkspace ? `${currentWorkspace.emoji} ${currentWorkspace.name}` : "Second Brain"}
+          {currentWorkspace ? `${currentWorkspace.emoji} ${currentWorkspace.name}` : "ESA AI"}
         </span>
       </header>
 

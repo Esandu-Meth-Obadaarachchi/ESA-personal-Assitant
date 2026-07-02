@@ -60,7 +60,7 @@ export function PrintView({
           </div>
           <div className="text-right text-xs text-neutral-400">
             <div>{new Date().toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}</div>
-            <div className="mt-1">Second Brain</div>
+            <div className="mt-1">ESA AI</div>
           </div>
         </div>
 
