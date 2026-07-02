@@ -11,7 +11,7 @@ import {
 import { useAuth } from "@/lib/auth/AuthContext";
 import type { Project, Task, Workspace } from "@/lib/types";
 import {
-  createProject,
+  ensureInbox,
   seedNewUser,
   watchAllTasks,
   watchProjects,
@@ -149,26 +149,35 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     [allUserTasks, currentWorkspaceId]
   );
 
-  // Ensure every workspace has an Inbox (older workspaces predate this feature).
+  // Ensure every workspace has exactly one Inbox. Runs once per workspace per
+  // session and heals duplicates (see ensureInbox). We trigger a heal both when
+  // no inbox is visible and when more than one is — the latter is the bug we saw
+  // in the overview.
   const inboxEnsured = useRef<Set<string>>(new Set());
   useEffect(() => {
     const ws = workspaces.find((w) => w.id === currentWorkspaceId);
-    if (!ws || !projects.length) return;
-    const hasInbox = projects.some((p) => p.isInbox && p.workspaceId === ws.id);
-    if (hasInbox || inboxEnsured.current.has(ws.id)) return;
+    if (!ws || !user || !projects.length) return;
+    const inboxCount = projects.filter((p) => p.isInbox && p.workspaceId === ws.id).length;
+    if (inboxCount === 1 || inboxEnsured.current.has(ws.id)) return;
     inboxEnsured.current.add(ws.id);
-    createProject(ws, "Inbox", { isInbox: true, description: "Loose tasks not tied to a project" }).catch(
-      () => inboxEnsured.current.delete(ws.id)
-    );
-  }, [workspaces, projects, currentWorkspaceId]);
+    ensureInbox(ws, user.uid).catch(() => inboxEnsured.current.delete(ws.id));
+  }, [workspaces, projects, currentWorkspaceId, user]);
 
   const value = useMemo<WorkspaceState>(() => {
     const currentWorkspace = workspaces.find((w) => w.id === currentWorkspaceId) ?? null;
-    const currentProject = projects.find((p) => p.id === currentProjectId) ?? null;
-    const inboxProject = projects.find((p) => p.isInbox) ?? null;
+    // Canonical inbox = the oldest one; drop any duplicates from the visible list
+    // so nothing downstream (overview, sidebar) ever renders two inboxes.
+    const inboxProject =
+      projects
+        .filter((p) => p.isInbox)
+        .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null;
+    const visibleProjects = projects.filter((p) => !p.isInbox || p.id === inboxProject?.id);
+    const currentProject =
+      visibleProjects.find((p) => p.id === currentProjectId) ??
+      (currentProjectId === inboxProject?.id ? inboxProject : null);
     return {
       workspaces,
-      projects,
+      projects: visibleProjects,
       tasks,
       workspaceTasks,
       currentWorkspace,
