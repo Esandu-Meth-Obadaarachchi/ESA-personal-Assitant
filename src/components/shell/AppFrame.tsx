@@ -1,15 +1,49 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { Menu } from "lucide-react";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { Logo } from "@/components/ui/Logo";
 import { Sidebar } from "./Sidebar";
 
 export function AppFrame({ children }: { children: React.ReactNode }) {
-  const { seeding } = useWorkspace();
+  const { seeding, currentWorkspace } = useWorkspace();
+  const [navOpen, setNavOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Close the mobile drawer whenever the route changes.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg">
-      <Sidebar />
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-bg lg:flex-row">
+      {/* Mobile top bar */}
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3 lg:hidden">
+        <button
+          onClick={() => setNavOpen(true)}
+          className="grid h-8 w-8 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <Logo size={20} />
+        <span className="truncate text-[13px] font-medium text-text">
+          {currentWorkspace ? `${currentWorkspace.emoji} ${currentWorkspace.name}` : "Second Brain"}
+        </span>
+      </header>
+
+      {/* Backdrop for the mobile drawer */}
+      {navOpen && (
+        <div
+          onClick={() => setNavOpen(false)}
+          className="fixed inset-0 z-40 animate-fade-in bg-black/50 backdrop-blur-sm lg:hidden"
+        />
+      )}
+
+      <Sidebar navOpen={navOpen} onNavClose={() => setNavOpen(false)} />
+
       <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
 
       {seeding && (

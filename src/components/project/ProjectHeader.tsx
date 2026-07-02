@@ -51,7 +51,7 @@ export function ProjectHeader({
           </h1>
         </div>
 
-        <div className="ml-1 flex items-center gap-1.5">
+        <div className="ml-1 hidden items-center gap-1.5 sm:flex">
           <Stat label="open" value={open} />
           {overdue > 0 && <Stat label="overdue" value={overdue} tone="danger" />}
           <Stat label="done" value={done} tone="ok" />
@@ -99,13 +99,13 @@ export function ProjectHeader({
       {printing && <PrintView project={project} tasks={tasks} onClose={() => setPrinting(false)} />}
 
       {/* tab switcher */}
-      <div className="flex items-center gap-0.5">
+      <div className="-mx-1 flex items-center gap-0.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => onTab(t.id)}
             className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+              "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
               tab === t.id
                 ? "bg-surface-2 text-text"
                 : "text-text-muted hover:bg-surface-2 hover:text-text"
