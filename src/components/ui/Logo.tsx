@@ -21,7 +21,7 @@ export function Wordmark({ className }: { className?: string }) {
     <div className={cn("flex items-center gap-2.5", className)}>
       <Logo />
       <span className="text-[15px] font-semibold tracking-tight text-text">
-        Second Brain
+        ESA AI
       </span>
     </div>
   );
