@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   addMonths,
   eachDayOfInterval,
@@ -27,6 +27,7 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { useTaskActions } from "@/lib/data/useTaskActions";
+import { authedFetch } from "@/lib/api";
 import { statusMeta } from "@/lib/constants";
 import { toISODate } from "@/lib/date";
 import type { Task } from "@/lib/types";
@@ -35,6 +36,13 @@ import { CalendarSync } from "@/components/project/CalendarSync";
 import { cn } from "@/lib/utils";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+interface GEvent {
+  id: string;
+  title: string;
+  time: string | null;
+  allDay: boolean;
+}
 
 export function CalendarView({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
   const { tasks } = useWorkspace();
@@ -58,6 +66,32 @@ export function CalendarView({ onOpenTask }: { onOpenTask: (t: Task) => void }) 
     });
     return map;
   }, [tasks]);
+
+  // Read-only overlay of the user's real Google Calendar events for the visible range.
+  const [gEvents, setGEvents] = useState<Record<string, GEvent[]>>({});
+  useEffect(() => {
+    if (days.length === 0) return;
+    const min = days[0];
+    const max = new Date(days[days.length - 1]);
+    max.setDate(max.getDate() + 1);
+    let cancelled = false;
+    authedFetch(
+      `/api/calendar/events?timeMin=${encodeURIComponent(min.toISOString())}&timeMax=${encodeURIComponent(max.toISOString())}`
+    )
+      .then((r) => r.json())
+      .then(({ events }: { events?: (GEvent & { date: string })[] }) => {
+        if (cancelled) return;
+        const map: Record<string, GEvent[]> = {};
+        (events ?? []).forEach((e) => {
+          (map[e.date] ??= []).push(e);
+        });
+        setGEvents(map);
+      })
+      .catch(() => !cancelled && setGEvents({}));
+    return () => {
+      cancelled = true;
+    };
+  }, [days]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const active = activeId ? tasks.find((t) => t.id === activeId) : null;
@@ -108,6 +142,7 @@ export function CalendarView({ onOpenTask }: { onOpenTask: (t: Task) => void }) 
               day={day}
               month={month}
               tasks={byDay.get(toISODate(day)) ?? []}
+              events={gEvents[toISODate(day)] ?? []}
               onOpenTask={onOpenTask}
             />
           ))}
@@ -124,17 +159,23 @@ function DayCell({
   day,
   month,
   tasks,
+  events,
   onOpenTask,
 }: {
   day: Date;
   month: Date;
   tasks: Task[];
+  events: GEvent[];
   onOpenTask: (t: Task) => void;
 }) {
   const iso = toISODate(day);
   const { setNodeRef, isOver } = useDroppable({ id: iso });
   const outside = !isSameMonth(day, month);
   const today = isToday(day);
+
+  const shownTasks = tasks.slice(0, 3);
+  const shownEvents = events.slice(0, 2);
+  const more = tasks.length - shownTasks.length + (events.length - shownEvents.length);
 
   return (
     <div
@@ -154,13 +195,28 @@ function DayCell({
         {format(day, "d")}
       </div>
       <div className="space-y-1 overflow-hidden">
-        {tasks.slice(0, 3).map((t) => (
+        {shownTasks.map((t) => (
           <Chip key={t.id} task={t} onOpen={() => onOpenTask(t)} />
         ))}
-        {tasks.length > 3 && (
-          <div className="px-1 text-2xs text-text-faint">+{tasks.length - 3} more</div>
-        )}
+        {shownEvents.map((e) => (
+          <GChip key={e.id} event={e} />
+        ))}
+        {more > 0 && <div className="px-1 text-2xs text-text-faint">+{more} more</div>}
       </div>
+    </div>
+  );
+}
+
+/** Read-only Google Calendar event chip (not a task). */
+function GChip({ event }: { event: GEvent }) {
+  return (
+    <div
+      className="flex items-center gap-1 rounded border border-info/25 bg-info/[0.08] px-1.5 py-0.5 text-2xs text-info"
+      title={`${event.title} (Google Calendar)`}
+    >
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-info" />
+      {event.time && <span className="mono shrink-0 opacity-80">{event.time}</span>}
+      <span className="truncate">{event.title}</span>
     </div>
   );
 }

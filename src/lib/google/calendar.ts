@@ -156,6 +156,32 @@ export async function listEvents(
   return { items, nextSyncToken };
 }
 
+/** Fetch events in a date range for read-only display (expands recurring events). */
+export async function listRange(
+  accessToken: string,
+  timeMin: string,
+  timeMax: string
+): Promise<CalEvent[]> {
+  const items: CalEvent[] = [];
+  let pageToken: string | undefined;
+  do {
+    const p = new URLSearchParams({
+      singleEvents: "true",
+      orderBy: "startTime",
+      timeMin,
+      timeMax,
+      maxResults: "250",
+    });
+    if (pageToken) p.set("pageToken", pageToken);
+    const res = await calFetch(accessToken, `/calendars/primary/events?${p}`);
+    if (!res.ok) throw new Error(`listRange failed: ${await res.text()}`);
+    const j = (await res.json()) as { items?: CalEvent[]; nextPageToken?: string };
+    items.push(...(j.items ?? []).filter((e) => e.status !== "cancelled"));
+    pageToken = j.nextPageToken;
+  } while (pageToken);
+  return items;
+}
+
 export async function watchCalendar(accessToken: string, channelId: string, address: string, token: string) {
   const res = await calFetch(accessToken, `/calendars/primary/events/watch`, {
     method: "POST",
