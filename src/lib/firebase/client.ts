@@ -32,7 +32,9 @@ export const auth = app ? getAuth(app) : null;
  */
 function makeDb(a: NonNullable<typeof app>): Firestore {
   try {
-    return initializeFirestore(a, { experimentalAutoDetectLongPolling: true });
+    // Force (not just auto-detect) long-polling: auto-detect can still pick the
+    // buggy WebChannel path on slow-mounting views like the whiteboard.
+    return initializeFirestore(a, { experimentalForceLongPolling: true });
   } catch {
     return getFirestore(a);
   }
