@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   BookOpen,
   CalendarCheck2,
+  FileText,
   Hash,
   Boxes,
   Inbox,
@@ -20,7 +21,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
-import { createProject, createTask, deleteProjectDeep } from "@/lib/data/firestore";
+import { createPage, createProject, createTask, deleteProjectDeep } from "@/lib/data/firestore";
 import type { Project } from "@/lib/types";
 import { useTheme } from "@/lib/theme/ThemeContext";
 import { Avatar } from "@/components/ui/Avatar";
@@ -43,7 +44,7 @@ export function Sidebar({
 }) {
   const { user, signOutUser } = useAuth();
   const { theme, toggle } = useTheme();
-  const { projects, workspaceTasks, currentProject, currentWorkspace, inboxProject, selectProject } =
+  const { projects, pages, workspaceTasks, currentProject, currentWorkspace, inboxProject, selectProject } =
     useWorkspace();
   const pathname = usePathname();
   const router = useRouter();
@@ -103,6 +104,14 @@ export function Sidebar({
   const openProject = (id: string) => {
     selectProject(id);
     router.push("/");
+    onNavClose?.();
+  };
+
+  const wsPages = pages.filter((p) => !p.projectId && !p.parentId);
+  const newWorkspacePage = async () => {
+    if (!currentWorkspace) return;
+    const id = await createPage(currentWorkspace, { projectId: null });
+    router.push(`/pages/${id}`);
     onNavClose?.();
   };
 
@@ -277,6 +286,51 @@ export function Sidebar({
             </button>
           )}
         </nav>
+      </div>
+
+      {/* Pages (workspace-level docs) */}
+      <div className="px-3 pb-1">
+        <div className="mb-1.5 flex items-center justify-between px-1">
+          <Link
+            href="/pages"
+            className={cn(
+              "text-2xs font-semibold uppercase tracking-wider transition-colors",
+              pathname.startsWith("/pages") ? "text-text" : "text-text-faint hover:text-text-muted"
+            )}
+          >
+            Pages
+          </Link>
+          <button
+            onClick={newWorkspacePage}
+            className="grid h-5 w-5 place-items-center rounded text-text-faint hover:bg-surface-2 hover:text-text"
+            title="New page"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="max-h-[22vh] space-y-0.5 overflow-y-auto">
+          {wsPages.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => {
+                router.push(`/pages/${p.id}`);
+                onNavClose?.();
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
+            >
+              <span className="shrink-0 text-sm leading-none">{p.icon || "📄"}</span>
+              <span className="flex-1 truncate">{p.title || "Untitled"}</span>
+            </button>
+          ))}
+          {wsPages.length === 0 && (
+            <button
+              onClick={newWorkspacePage}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-faint hover:text-text-muted"
+            >
+              <FileText className="h-3.5 w-3.5" /> New page
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Secondary nav */}

@@ -10,11 +10,12 @@ import {
 } from "react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { postJSON } from "@/lib/api";
-import type { Project, Task, Workspace } from "@/lib/types";
+import type { Page, Project, Task, Workspace } from "@/lib/types";
 import {
   ensureInbox,
   seedNewUser,
   watchAllTasks,
+  watchPages,
   watchProjects,
   watchTasks,
   watchWorkspaces,
@@ -28,6 +29,8 @@ interface WorkspaceState {
   workspaceTasks: Task[];
   /** Every task the user can see across every workspace (powers Today). */
   allTasks: Task[];
+  /** Pages (Notion docs) in the current workspace. */
+  pages: Page[];
   currentWorkspace: Workspace | null;
   currentProject: Project | null;
   /** The current workspace's catch-all Inbox project. */
@@ -60,6 +63,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [allUserTasks, setAllUserTasks] = useState<Task[]>([]);
+  const [pages, setPages] = useState<Page[]>([]);
 
   // 1. Watch workspaces; seed a new user exactly once.
   useEffect(() => {
@@ -156,6 +160,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return watchAllTasks(user.uid, setAllUserTasks);
   }, [user]);
 
+  // Watch the current workspace's pages (Notion docs).
+  useEffect(() => {
+    if (!user || !currentWorkspaceId) {
+      setPages([]);
+      return;
+    }
+    return watchPages(user.uid, currentWorkspaceId, setPages);
+  }, [user, currentWorkspaceId]);
+
   const workspaceTasks = useMemo(
     () => allUserTasks.filter((t) => t.workspaceId === currentWorkspaceId),
     [allUserTasks, currentWorkspaceId]
@@ -193,6 +206,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       tasks,
       workspaceTasks,
       allTasks: allUserTasks,
+      pages,
       currentWorkspace,
       currentProject,
       inboxProject,
@@ -212,7 +226,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         setCurrentWorkspaceId(workspaceId);
       },
     };
-  }, [workspaces, projects, tasks, workspaceTasks, allUserTasks, currentWorkspaceId, currentProjectId, wsLoaded, seeding, tasksLoading]);
+  }, [workspaces, projects, tasks, workspaceTasks, allUserTasks, pages, currentWorkspaceId, currentProjectId, wsLoaded, seeding, tasksLoading]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
