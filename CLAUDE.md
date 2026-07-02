@@ -48,25 +48,27 @@ src/
     (auth)/login/page.tsx      Google sign-in
     (app)/layout.tsx           Auth guard -> WorkspaceProvider -> AppFrame
     (app)/page.tsx             Project View (Tree/Board/List/Calendar + task drawer)
+    (app)/overview/page.tsx    Per-workspace dashboard (project cards, status, attention)
     (app)/agent/page.tsx       Standup + chat surface
     (app)/knowledge/page.tsx   Document / note ingestion
     api/chat/route.ts          Claude agent (POST)
     api/ingest/route.ts        parse -> chunk -> embed -> Pinecone upsert (POST)
     api/related/route.ts       Smart linking: related knowledge for a task (POST)
-    api/calendar/*             Google Calendar OAuth + two-way sync
-                               (connect, callback, status, disconnect, push, sync, webhook)
+    api/calendar/*             Google Calendar OAuth + two-way sync (connect, callback,
+                               status, disconnect, push, sync, webhook, events overlay)
   components/
     ui/        Design-system primitives (Button, Avatar, Dropdown, Modal, chips...)
     shell/     Sidebar, WorkspaceSwitcher, AppFrame
-    task/      TaskRow, TaskCard, TaskDrawer, Pickers
-    views/     TreeView, KanbanBoard, ListView, CalendarView
-    project/   ProjectHeader (tabs + stats)
+    task/      TaskRow, TaskCard, TaskDrawer, Pickers, TimeTracker
+    views/     TreeView, KanbanBoard, ListView, CalendarView, DayDetail
+    project/   ProjectHeader (tabs + stats + export), PrintView, CalendarSync
     agent/     StandupCard, AgentMessage, cards
   lib/
     firebase/  client.ts (browser), admin.ts (server, requireUser)
     auth/      AuthContext
     theme/     ThemeContext
-    data/      firestore.ts, WorkspaceContext, useTaskActions, tree.ts, standup.ts
+    data/      firestore.ts, WorkspaceContext (tasks + workspaceTasks + inboxProject),
+               useTaskActions, tree.ts, standup.ts
     ai/        voyage.ts, pinecone.ts, anthropic.ts, chunker.ts, parse.ts,
                persona.ts, tools.ts, agent.ts, server.ts
     google/    calendar.ts (OAuth + Calendar v3), store.ts (server token store), sync.ts

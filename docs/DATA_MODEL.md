@@ -22,6 +22,7 @@ description: string
 ragNamespace: string        # Pinecone namespace for this project's knowledge
 color: string               # hex from PROJECT_COLORS
 archived: boolean
+isInbox: boolean            # the per-workspace catch-all for project-less tasks
 createdAt: number
 memberIds: string[]         # denormalised from the workspace for rules
 ```
@@ -35,14 +36,22 @@ status: "todo" | "in_progress" | "blocked" | "done"
 priority: "low" | "med" | "high" | "urgent"
 assigneeId, assigneeName, assigneeAvatar
 dueDate, startDate: string | null   # yyyy-mm-dd
+dueTime: string | null      # HH:MM (24h); null => all-day
 tags: string[]
 dependencies: string[]      # task ids
 linkedDocs: LinkedDoc[]
+recurrence: {freq, interval} | null # spawns the next occurrence on completion
+timeEntries: TimeEntry[]    # time tracking (start/end/seconds)
+googleEventId: string | null        # linked Google Calendar event (when synced)
 order: number               # sibling ordering within a level / column
 createdAt, updatedAt: number
 createdBy: string
 memberIds: string[]         # isolation
 ```
+
+> Server-only collections (never in `firestore.rules`, so clients can't read
+> them): `calendarConnections/{uid}` (Google refresh token + sync state) and
+> `calendarOAuthStates/{state}` (short-lived OAuth handshake).
 
 The task tree is stored flat and assembled client-side (`lib/data/tree.ts` -> `buildTree`). Subtasks nest arbitrarily deep via `parentId`.
 
