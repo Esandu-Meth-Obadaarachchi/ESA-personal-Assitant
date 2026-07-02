@@ -32,11 +32,12 @@ import { toISODate } from "@/lib/date";
 import type { Task } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { CalendarSync } from "@/components/project/CalendarSync";
+import { DayDetail } from "./DayDetail";
 import { cn } from "@/lib/utils";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-interface GEvent {
+export interface GEvent {
   id: string;
   title: string;
   time: string | null;
@@ -48,7 +49,9 @@ export function CalendarView({ onOpenTask }: { onOpenTask: (t: Task) => void }) 
   const actions = useTaskActions();
   const [month, setMonth] = useState(() => new Date());
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const projColor = useMemo(() => new Map(projects.map((p) => [p.id, p.color])), [projects]);
+  const projName = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects]);
 
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
@@ -145,6 +148,7 @@ export function CalendarView({ onOpenTask }: { onOpenTask: (t: Task) => void }) 
               events={gEvents[toISODate(day)] ?? []}
               projColor={projColor}
               onOpenTask={onOpenTask}
+              onSelectDay={setSelectedDay}
             />
           ))}
         </div>
@@ -152,6 +156,20 @@ export function CalendarView({ onOpenTask }: { onOpenTask: (t: Task) => void }) 
           {active ? <Chip task={active} color={projColor.get(active.projectId)} overlay /> : null}
         </DragOverlay>
       </DndContext>
+
+      {selectedDay && (
+        <DayDetail
+          iso={selectedDay}
+          tasks={byDay.get(selectedDay) ?? []}
+          events={gEvents[selectedDay] ?? []}
+          projColor={projColor}
+          projName={projName}
+          onOpenTask={onOpenTask}
+          onSetStatus={(id, s) => actions.setStatus(id, s)}
+          onAdd={(title) => actions.add(title, { dueDate: selectedDay })}
+          onClose={() => setSelectedDay(null)}
+        />
+      )}
     </div>
   );
 }
@@ -163,6 +181,7 @@ function DayCell({
   events,
   projColor,
   onOpenTask,
+  onSelectDay,
 }: {
   day: Date;
   month: Date;
@@ -170,6 +189,7 @@ function DayCell({
   events: GEvent[];
   projColor: Map<string, string>;
   onOpenTask: (t: Task) => void;
+  onSelectDay: (iso: string) => void;
 }) {
   const iso = toISODate(day);
   const { setNodeRef, isOver } = useDroppable({ id: iso });
@@ -183,8 +203,9 @@ function DayCell({
   return (
     <div
       ref={setNodeRef}
+      onClick={() => onSelectDay(iso)}
       className={cn(
-        "flex min-h-[92px] flex-col gap-1 border-b border-r border-border/60 p-1.5 transition-colors",
+        "flex min-h-[92px] cursor-pointer flex-col gap-1 border-b border-r border-border/60 p-1.5 transition-colors hover:bg-surface/50",
         outside && "bg-surface/30",
         isOver && "bg-accent/[0.06] ring-1 ring-inset ring-accent/30"
       )}
@@ -241,7 +262,10 @@ function Chip({
       ref={overlay ? undefined : setNodeRef}
       {...(overlay ? {} : attributes)}
       {...(overlay ? {} : listeners)}
-      onClick={onOpen}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen?.();
+      }}
       title={task.title}
       className={cn(
         "flex cursor-pointer items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 text-2xs text-text",
