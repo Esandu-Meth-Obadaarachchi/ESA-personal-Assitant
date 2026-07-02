@@ -7,6 +7,7 @@ import {
   BookOpen,
   Hash,
   Inbox,
+  LayoutGrid,
   LogOut,
   Moon,
   Plus,
@@ -97,7 +98,19 @@ export function Sidebar() {
         <WorkspaceSwitcher />
       </div>
 
-      <div className="px-3">
+      <div className="space-y-1 px-3">
+        <Link
+          href="/overview"
+          className={cn(
+            "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
+            pathname === "/overview"
+              ? "bg-surface-2 text-text"
+              : "text-text-muted hover:bg-surface-2 hover:text-text"
+          )}
+        >
+          <LayoutGrid className="h-4 w-4" />
+          Overview
+        </Link>
         <Link
           href="/agent"
           className={cn(

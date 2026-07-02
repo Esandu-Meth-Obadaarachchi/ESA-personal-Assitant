@@ -14,6 +14,10 @@ From `second-brain-app-spec.md` §5. This build delivers a solid runnable founda
 | 4 | WhatsApp Cloud API bot | Not started — reuses `runAgent` behind a webhook route |
 | 5 | Time tracking, recurring tasks, templates, roles | **Time tracking + recurring tasks done**; roles modelled (`WorkspaceMember.role`); templates not started |
 | — | Single-page doc export (Phase 1) | **Done** — printable project + task-tree, PDF via print |
+| — | Time-of-day on tasks | **Done** — `dueTime`; timed calendar events |
+| — | Inbox (tasks without a project) | **Done** — per-workspace Inbox + sidebar quick-capture |
+| — | Workspace overview dashboard | **Done** — `/overview`: project cards, status summary, attention list |
+| — | Calendar: day agenda + cross-project + read-only Google events | **Done** — click a date for its agenda; calendar shows all workspace tasks colour-coded by project |
 | 6 | Stripe billing + client-viewer portal | Not started |
 
 ## What is intentionally stubbed / not built
