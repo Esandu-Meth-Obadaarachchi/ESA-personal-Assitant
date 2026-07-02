@@ -40,6 +40,8 @@ export interface Project {
   ragNamespace: string;
   color: string;
   archived?: boolean;
+  /** The per-workspace catch-all for tasks not tied to a real project. */
+  isInbox?: boolean;
   createdAt: number;
 }
 
