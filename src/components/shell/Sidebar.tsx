@@ -29,7 +29,7 @@ import { Field, Modal, inputClass } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
-export function Sidebar() {
+export function Sidebar({ navOpen = false, onNavClose }: { navOpen?: boolean; onNavClose?: () => void }) {
   const { user, signOutUser } = useAuth();
   const { theme, toggle } = useTheme();
   const { projects, workspaceTasks, currentProject, currentWorkspace, inboxProject, selectProject } =
@@ -92,10 +92,20 @@ export function Sidebar() {
   const openProject = (id: string) => {
     selectProject(id);
     router.push("/");
+    onNavClose?.();
   };
 
   return (
-    <aside className="flex h-full w-[248px] shrink-0 flex-col border-r border-border bg-surface/40">
+    <aside
+      className={cn(
+        "flex w-[248px] shrink-0 flex-col border-r border-border bg-surface/40",
+        // Mobile: fixed slide-in drawer with an opaque background.
+        "fixed inset-y-0 left-0 z-50 h-[100dvh] -translate-x-full transition-transform duration-300 ease-out max-lg:bg-bg",
+        // Desktop: static column, always visible.
+        "lg:static lg:z-auto lg:h-full lg:translate-x-0 lg:transition-none",
+        navOpen && "translate-x-0 shadow-2xl"
+      )}
+    >
       <div className="p-3">
         <WorkspaceSwitcher />
       </div>

@@ -66,9 +66,11 @@ export default function OverviewPage() {
           <div className="text-xs text-text-muted">Workspace overview</div>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          <Stat label="open" value={open} />
-          {digest.overdue.length > 0 && <Stat label="overdue" value={digest.overdue.length} tone="danger" />}
-          <Stat label="done" value={done} />
+          <div className="hidden items-center gap-1.5 sm:flex">
+            <Stat label="open" value={open} />
+            {digest.overdue.length > 0 && <Stat label="overdue" value={digest.overdue.length} tone="danger" />}
+            <Stat label="done" value={done} />
+          </div>
           <button
             onClick={() => setSharing(true)}
             className="ml-1 inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2.5 text-2xs font-medium text-text-muted transition-colors hover:border-border-strong hover:text-text"
