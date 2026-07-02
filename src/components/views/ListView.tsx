@@ -64,7 +64,13 @@ export function ListView({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
                     {t.tags.slice(0, 2).map((tag) => (
                       <TagChip key={tag} tag={tag} />
                     ))}
-                    <DuePicker value={t.dueDate} status={t.status} onChange={(d) => actions.setDue(t.id, d)} />
+                    <DuePicker
+                      value={t.dueDate}
+                      time={t.dueTime}
+                      status={t.status}
+                      onChange={(d) => actions.setDue(t.id, d)}
+                      onTimeChange={(tm) => actions.setDueTime(t.id, tm)}
+                    />
                     <PrioritySelect value={t.priority} onChange={(p) => actions.setPriority(t.id, p)} />
                     <AssigneePicker
                       value={{ id: t.assigneeId, name: t.assigneeName, avatar: t.assigneeAvatar }}

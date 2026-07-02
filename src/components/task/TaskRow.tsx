@@ -98,7 +98,7 @@ export function TaskRow({
           <TagChip key={t} tag={t} />
         ))}
         {total > 0 && <SubtaskProgress done={done} total={total} className="hidden md:inline-flex" />}
-        {node.dueDate && <DueDateChip date={node.dueDate} status={node.status} />}
+        {node.dueDate && <DueDateChip date={node.dueDate} time={node.dueTime} status={node.status} />}
         <PrioritySelect value={node.priority} onChange={(p) => actions.setPriority(node.id, p)} />
         <AssigneePicker
           value={{ id: node.assigneeId, name: node.assigneeName, avatar: node.assigneeAvatar }}
