@@ -5,6 +5,7 @@ import {
   getDocs,
   onSnapshot,
   query,
+  setDoc,
   updateDoc,
   where,
   writeBatch,
@@ -13,7 +14,7 @@ import {
 import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase/client";
 import { PROJECT_COLORS } from "@/lib/constants";
-import type { Project, Task, Workspace, WorkspaceMember } from "@/lib/types";
+import type { DayPlan, Project, Task, Workspace, WorkspaceMember } from "@/lib/types";
 import { slugifyNamespace } from "./tree";
 
 /**
@@ -324,6 +325,30 @@ export async function commitTaskMoves(moves: { id: string; order: number; parent
     batch.update(doc(requireDb(), "tasks", m.id), patch);
   });
   await batch.commit();
+}
+
+/* ------------------------------ day planner ------------------------------ */
+
+/** Live-watch the user's notebook for a given day (yyyy-mm-dd). */
+export function watchDayPlan(uid: string, date: string, cb: (content: string) => void): Unsubscribe {
+  const ref = doc(requireDb(), "dayPlans", `${uid}_${date}`);
+  return onSnapshot(
+    ref,
+    (snap) => cb(((snap.data() as DayPlan | undefined)?.content) ?? ""),
+    (err) => console.error("watchDayPlan error", err)
+  );
+}
+
+/** Upsert the user's notebook for a given day. */
+export async function saveDayPlan(uid: string, date: string, content: string) {
+  const ref = doc(requireDb(), "dayPlans", `${uid}_${date}`);
+  await setDoc(ref, {
+    uid,
+    date,
+    content,
+    updatedAt: Date.now(),
+    memberIds: [uid],
+  } satisfies Omit<DayPlan, "id">);
 }
 
 /* ------------------------------ first-run seed ------------------------------ */

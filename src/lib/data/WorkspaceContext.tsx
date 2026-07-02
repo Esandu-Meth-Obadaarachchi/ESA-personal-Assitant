@@ -25,6 +25,8 @@ interface WorkspaceState {
   tasks: Task[];
   /** Every task in the current workspace across all its projects. */
   workspaceTasks: Task[];
+  /** Every task the user can see across every workspace (powers Today). */
+  allTasks: Task[];
   currentWorkspace: Workspace | null;
   currentProject: Project | null;
   /** The current workspace's catch-all Inbox project. */
@@ -180,6 +182,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       projects: visibleProjects,
       tasks,
       workspaceTasks,
+      allTasks: allUserTasks,
       currentWorkspace,
       currentProject,
       inboxProject,
@@ -199,7 +202,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         setCurrentWorkspaceId(workspaceId);
       },
     };
-  }, [workspaces, projects, tasks, workspaceTasks, currentWorkspaceId, currentProjectId, wsLoaded, seeding, tasksLoading]);
+  }, [workspaces, projects, tasks, workspaceTasks, allUserTasks, currentWorkspaceId, currentProjectId, wsLoaded, seeding, tasksLoading]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -31,5 +31,12 @@ service cloud.firestore {
       allow create: if isMember(request.resource.data);
       allow update, delete: if isMember(resource.data);
     }
+
+    // Per-user daily planner notes. memberIds is always the single owner uid.
+    match /dayPlans/{id} {
+      allow read: if isMember(resource.data);
+      allow create: if isMember(request.resource.data);
+      allow update, delete: if isMember(resource.data);
+    }
   }
 }
