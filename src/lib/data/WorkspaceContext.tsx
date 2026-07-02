@@ -34,6 +34,8 @@ interface WorkspaceState {
   tasksLoading: boolean;
   selectWorkspace: (id: string) => void;
   selectProject: (id: string) => void;
+  /** Jump to a specific project in any workspace (used by the all-workspaces board). */
+  openWorkspaceProject: (workspaceId: string, projectId: string) => void;
 }
 
 const Ctx = createContext<WorkspaceState | null>(null);
@@ -180,6 +182,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         setCurrentProjectId(null); // let effect 4 pick the first project of the new ws
       },
       selectProject: setCurrentProjectId,
+      openWorkspaceProject: (workspaceId, projectId) => {
+        // Stash the target project so effect 4 selects it once the new
+        // workspace's projects load (cross-workspace navigation).
+        if (typeof window !== "undefined") localStorage.setItem(LS_PROJ, projectId);
+        setCurrentProjectId(null);
+        setCurrentWorkspaceId(workspaceId);
+      },
     };
   }, [workspaces, projects, tasks, workspaceTasks, currentWorkspaceId, currentProjectId, wsLoaded, seeding, tasksLoading]);
 

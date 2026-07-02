@@ -78,6 +78,16 @@ export function watchTasks(uid: string, projectId: string, cb: (t: Task[]) => vo
   );
 }
 
+/** Every project the user can see across all workspaces — powers the all-workspaces board. */
+export function watchAllProjects(uid: string, cb: (p: Project[]) => void): Unsubscribe {
+  const q = query(collection(requireDb(), "projects"), where("memberIds", "array-contains", uid));
+  return onSnapshot(
+    q,
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Project, "id">) }))),
+    (err) => console.error("watchAllProjects error", err)
+  );
+}
+
 /** Every task the user can see — powers the cross-project daily standup. */
 export function watchAllTasks(uid: string, cb: (t: Task[]) => void): Unsubscribe {
   const q = query(collection(requireDb(), "tasks"), where("memberIds", "array-contains", uid));

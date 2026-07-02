@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   BookOpen,
   Hash,
+  Boxes,
   Inbox,
   LayoutGrid,
   LogOut,
@@ -110,6 +111,18 @@ export function Sidebar() {
         >
           <LayoutGrid className="h-4 w-4" />
           Overview
+        </Link>
+        <Link
+          href="/workspaces"
+          className={cn(
+            "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
+            pathname === "/workspaces"
+              ? "bg-surface-2 text-text"
+              : "text-text-muted hover:bg-surface-2 hover:text-text"
+          )}
+        >
+          <Boxes className="h-4 w-4" />
+          All workspaces
         </Link>
         <Link
           href="/agent"
