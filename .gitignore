@@ -2,7 +2,7 @@
 /node_modules
 /.pnp
 .pnp.js
-
+./ESAI - VERSION 1 ONLY RAG
 # testing
 /coverage
 
