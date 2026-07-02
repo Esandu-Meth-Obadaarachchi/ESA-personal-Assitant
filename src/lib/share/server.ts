@@ -94,14 +94,12 @@ export async function createInvite(
     throw new Response("That person is already a member", { status: 409 });
   }
 
+  // Single-field query + in-memory filter so no composite index is ever needed.
   const db = adminDb();
-  const existing = await db
-    .collection("invites")
-    .where("workspaceId", "==", input.workspaceId)
-    .where("email", "==", email)
-    .where("status", "==", "pending")
-    .limit(1)
-    .get();
+  const wsInvites = await db.collection("invites").where("workspaceId", "==", input.workspaceId).get();
+  const existingDoc = wsInvites.docs.find(
+    (d) => (d.get("email") ?? "").toLowerCase() === email && d.get("status") === "pending"
+  );
 
   const payload: Omit<Invite, "id"> = {
     workspaceId: ws.id,
@@ -116,8 +114,8 @@ export async function createInvite(
     status: "pending",
   };
 
-  if (!existing.empty) {
-    await existing.docs[0].ref.update({ ...payload });
+  if (existingDoc) {
+    await existingDoc.ref.update({ ...payload });
   } else {
     await db.collection("invites").add(payload);
   }
@@ -128,11 +126,12 @@ export async function acceptInvites(caller: AuthedUser): Promise<number> {
   const email = caller.email?.toLowerCase();
   if (!email) return 0;
   const db = adminDb();
-  const snap = await db.collection("invites").where("email", "==", email).where("status", "==", "pending").get();
-  if (snap.empty) return 0;
+  const snap = await db.collection("invites").where("email", "==", email).get();
+  const pending = snap.docs.filter((d) => d.get("status") === "pending");
+  if (pending.length === 0) return 0;
 
   let claimed = 0;
-  for (const inviteDoc of snap.docs) {
+  for (const inviteDoc of pending) {
     const invite = inviteDoc.data() as Omit<Invite, "id">;
     try {
       const { data: ws } = await loadWorkspaceUnchecked(invite.workspaceId);
@@ -211,11 +210,9 @@ export async function revokeInvite(caller: AuthedUser, input: { workspaceId: str
 
 export async function listShare(caller: AuthedUser, workspaceId: string) {
   const { data: ws } = await loadWorkspace(caller.uid, workspaceId);
-  const snap = await adminDb()
-    .collection("invites")
-    .where("workspaceId", "==", workspaceId)
-    .where("status", "==", "pending")
-    .get();
-  const invites: Invite[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Invite, "id">) }));
+  const snap = await adminDb().collection("invites").where("workspaceId", "==", workspaceId).get();
+  const invites: Invite[] = snap.docs
+    .filter((d) => d.get("status") === "pending")
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<Invite, "id">) }));
   return { members: ws.members, invites, isManager: isManager(ws.members, caller.uid), ownerId: ws.ownerId };
 }
