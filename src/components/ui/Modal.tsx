@@ -38,7 +38,7 @@ export function Modal({
         onClick={onClose}
       />
       <div
-        className={cn("card relative z-10 animate-fade-in p-5 shadow-pop lit")}
+        className={cn("card relative z-10 animate-scale-in p-5 shadow-pop lit")}
         style={{ width, maxWidth: "calc(100vw - 2rem)" }}
         role="dialog"
         aria-modal

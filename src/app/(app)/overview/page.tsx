@@ -166,7 +166,7 @@ function ProjectCard({ project, tasks, onOpen }: { project: Project; tasks: Task
   return (
     <button
       onClick={onOpen}
-      className="card p-3.5 text-left transition-colors hover:border-border-strong"
+      className="card lift p-3.5 text-left hover:border-border-strong hover:shadow-card"
     >
       <div className="flex items-center gap-2">
         {project.isInbox ? (
