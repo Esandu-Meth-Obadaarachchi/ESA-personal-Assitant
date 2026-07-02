@@ -46,7 +46,7 @@ export function ShareDialog({ workspace, open, onClose }: { workspace: Workspace
     setLoading(true);
     setError(null);
     try {
-      const res = await authedFetch(`/api/share?workspaceId=${workspace.id}`);
+      const res = await authedFetch(`/api/members?workspaceId=${workspace.id}`);
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to load");
       setState(await res.json());
     } catch (e) {
@@ -68,7 +68,7 @@ export function ShareDialog({ workspace, open, onClose }: { workspace: Workspace
     setBusy(true);
     setError(null);
     try {
-      await postJSON("/api/share", { workspaceId: workspace.id, ...body });
+      await postJSON("/api/members", { workspaceId: workspace.id, ...body });
       await load();
       return true;
     } catch (e) {
