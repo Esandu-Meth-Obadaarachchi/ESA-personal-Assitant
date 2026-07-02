@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
-import { AlertTriangle, CalendarClock, Inbox as InboxIcon, LayoutGrid } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertTriangle, CalendarClock, Inbox as InboxIcon, LayoutGrid, Users } from "lucide-react";
+import { ShareDialog } from "@/components/shell/ShareDialog";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { computeDigest } from "@/lib/data/standup";
 import { STATUS_ORDER, statusMeta } from "@/lib/constants";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 export default function OverviewPage() {
   const { currentWorkspace, projects, workspaceTasks, selectProject } = useWorkspace();
   const router = useRouter();
+  const [sharing, setSharing] = useState(false);
 
   const digest = useMemo(() => computeDigest(workspaceTasks), [workspaceTasks]);
   const open = workspaceTasks.filter((t) => t.status !== "done").length;
@@ -67,8 +69,16 @@ export default function OverviewPage() {
           <Stat label="open" value={open} />
           {digest.overdue.length > 0 && <Stat label="overdue" value={digest.overdue.length} tone="danger" />}
           <Stat label="done" value={done} />
+          <button
+            onClick={() => setSharing(true)}
+            className="ml-1 inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2.5 text-2xs font-medium text-text-muted transition-colors hover:border-border-strong hover:text-text"
+          >
+            <Users className="h-3.5 w-3.5" /> Share
+          </button>
         </div>
       </header>
+
+      <ShareDialog workspace={currentWorkspace} open={sharing} onClose={() => setSharing(false)} />
 
       <div className="mx-auto max-w-5xl space-y-7 px-5 py-6">
         {/* status summary */}

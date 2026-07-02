@@ -28,7 +28,9 @@ export function useTaskActions() {
 
   return useMemo(() => {
     const ready = Boolean(user && currentWorkspace && currentProject);
-    const memberIds = currentWorkspace?.memberIds ?? [];
+    // A task inherits the access list of its project (so project-scoped
+    // teammates see it), falling back to the workspace for older projects.
+    const memberIds = currentProject?.memberIds ?? currentWorkspace?.memberIds ?? [];
 
     const nextOrder = (parentId: string | null) => {
       const siblings = tasks.filter((t) => t.parentId === parentId);
