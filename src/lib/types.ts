@@ -128,6 +128,20 @@ export interface DayPlan {
   memberIds: string[];
 }
 
+/**
+ * A per-project Excalidraw whiteboard. The scene (elements + files) is stored as
+ * a JSON string because Excalidraw elements contain nested arrays (point lists)
+ * which Firestore does not allow as native fields. One doc per project.
+ */
+export interface Whiteboard {
+  id: string;
+  projectId: string;
+  /** JSON.stringify({ elements, files }). */
+  scene: string;
+  memberIds: string[];
+  updatedAt: number;
+}
+
 /** Retrieval + chat wire types (RAG). */
 export interface RetrievedChunk {
   id: string;

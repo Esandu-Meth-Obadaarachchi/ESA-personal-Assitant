@@ -16,6 +16,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@excalidraw/excalidraw": "^0.18.1",
     "@pinecone-database/pinecone": "^3.0.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
