@@ -21,7 +21,8 @@ async function auth(req: Request) {
   }
 }
 
-/** GET /api/share?workspaceId=... — members + pending invites for a workspace. */
+/** GET /api/members?workspaceId=... — members + pending invites for a workspace.
+ *  Endpoint is /api/members, not /api/share: ad-blockers block "share" URLs. */
 export async function GET(req: Request) {
   try {
     const user = await auth(req);
@@ -33,7 +34,7 @@ export async function GET(req: Request) {
   }
 }
 
-/** POST /api/share — dispatch on `action`. */
+/** POST /api/members — dispatch on `action`. */
 export async function POST(req: Request) {
   try {
     const user = await auth(req);

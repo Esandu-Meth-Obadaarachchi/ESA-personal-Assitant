@@ -147,7 +147,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user || acceptedRef.current) return;
     acceptedRef.current = true;
-    postJSON("/api/share", { action: "accept" }).catch(() => {});
+    postJSON("/api/members", { action: "accept" }).catch(() => {});
   }, [user]);
 
   // Watch every task the user can see; the calendar + overview use the
