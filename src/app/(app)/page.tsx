@@ -9,9 +9,11 @@ import { TreeView } from "@/components/views/TreeView";
 import { KanbanBoard } from "@/components/views/KanbanBoard";
 import { ListView } from "@/components/views/ListView";
 import { CalendarView } from "@/components/views/CalendarView";
+import { MindMapView } from "@/components/views/MindMapView";
 import { TaskDrawer } from "@/components/task/TaskDrawer";
 import { RowSkeleton } from "@/components/ui/Skeleton";
 import { Logo } from "@/components/ui/Logo";
+import { cn } from "@/lib/utils";
 
 export default function ProjectViewPage() {
   const { currentProject, tasks, tasksLoading, loading } = useWorkspace();
@@ -71,7 +73,7 @@ export default function ProjectViewPage() {
     <div className="relative flex h-full flex-col overflow-hidden">
       <ProjectHeader project={currentProject} tasks={tasks} tab={tab} onTab={changeTab} />
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className={cn("min-h-0 flex-1", tab === "map" ? "overflow-hidden" : "overflow-auto")}>
         {tasksLoading ? (
           <div className="mx-auto max-w-4xl py-4">
             {[0, 1, 2, 3, 4].map((i) => (
@@ -84,8 +86,10 @@ export default function ProjectViewPage() {
           <KanbanBoard onOpenTask={setSelected} />
         ) : tab === "list" ? (
           <ListView onOpenTask={setSelected} />
-        ) : (
+        ) : tab === "calendar" ? (
           <CalendarView onOpenTask={setSelected} />
+        ) : (
+          <MindMapView onOpenTask={setSelected} />
         )}
       </div>
 
