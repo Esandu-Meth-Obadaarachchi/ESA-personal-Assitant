@@ -2,6 +2,17 @@
 
 Second Brain runs against your own Firebase, Voyage, Pinecone and Anthropic accounts. Nothing is hosted for you — you own the data.
 
+> ## Already provisioned (this repo's instance)
+>
+> The Firebase backend is set up and wired in `.env.local` (untracked). You do **not** need to redo steps 1–2 unless you are starting a fresh instance.
+>
+> - **Project:** `second-brain-fbf414` (owner `eobadaarachchi@gmail.com`), pinned in `.firebaserc`
+> - **Google sign-in:** enabled · **Firestore:** live in `asia-south1` · **Rules:** deployed
+> - **Admin SDK key:** generated for `firebase-adminsdk-fbsvc@…` and set in `.env.local` (verified working)
+> - **Pending:** `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `PINECONE_API_KEY` (the agent side — see steps 3–5)
+>
+> Just `npm install && npm run dev`. The sections below are the from-scratch guide for a new environment.
+
 ## 1. Install
 
 ```bash

@@ -2,6 +2,8 @@
 
 From `second-brain-app-spec.md` §5. This build delivers a solid runnable foundation (Phase 1 + auth + the Claude agent/RAG core). Later phases are scaffolded to slot into the server boundary.
 
+**Backend is live.** Firebase project `second-brain-fbf414` is provisioned: Google auth enabled, Firestore in `asia-south1` with rules deployed, Admin SDK key set. The task manager runs end to end today. The agent/RAG needs `ANTHROPIC_API_KEY` + `VOYAGE_API_KEY` + `PINECONE_API_KEY` (still blank). See `docs/SETUP.md`.
+
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Data model, React app, task CRUD, four views, doc export | **Done** (doc export pending) |

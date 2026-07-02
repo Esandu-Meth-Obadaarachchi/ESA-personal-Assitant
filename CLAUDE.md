@@ -27,6 +27,18 @@ Full product intent is in `second-brain-app-spec.md` and `second-brain-design-br
 
 Model + RAG rationale: `docs/RAG.md`. Data model: `docs/DATA_MODEL.md`. Visual system: `docs/DESIGN_SYSTEM.md`. Architecture: `docs/ARCHITECTURE.md`. Setup: `docs/SETUP.md`. Roadmap + phase status: `docs/ROADMAP.md`.
 
+## Live instance (provisioned)
+
+A working Firebase backend is already provisioned and wired via `.env.local` (untracked):
+
+- **Firebase project:** `second-brain-fbf414` (owner `eobadaarachchi@gmail.com`), pinned in `.firebaserc`.
+- **Auth:** Google sign-in enabled. Signed-in users are seeded with Office / Freelance / LeadX workspaces on first login.
+- **Firestore:** created in `asia-south1`, security rules deployed. Live data confirmed (workspaces/projects/tasks tied to the owner uid).
+- **Admin SDK:** service-account key (`firebase-adminsdk-fbsvc@…`) generated and set in `.env.local`, verified working — so the API routes' auth (`requireUser`) and agent task writes are ready.
+- **Still blank (add when doing the agent):** `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `PINECONE_API_KEY`. Until these exist, the task manager is fully functional; `/api/chat`, `/api/ingest`, `/api/related` return a clear error.
+
+Setup for a fresh instance from scratch: `docs/SETUP.md`.
+
 ## Directory map
 
 ```
