@@ -4,15 +4,24 @@ import {
   createEvent,
   deleteEvent,
   getAccessToken,
+  getCalendarTimeZone,
   listEvents,
   updateEvent,
 } from "./calendar";
-import { getConnection, getTask, saveConnection } from "./store";
+import { getConnection, getTask, saveConnection, type CalendarConnection } from "./store";
 
 type TaskDoc = Task & { memberIds?: string[] };
 
 async function patchTask(id: string, patch: Record<string, unknown>) {
   await adminDb().collection("tasks").doc(id).update({ ...patch, updatedAt: Date.now() });
+}
+
+/** Cached primary-calendar timezone (needed for timed events); fetched once. */
+async function ensureTimeZone(uid: string, conn: CalendarConnection, accessToken: string): Promise<string | undefined> {
+  if (conn.timeZone) return conn.timeZone;
+  const tz = await getCalendarTimeZone(accessToken);
+  if (tz) await saveConnection(uid, { timeZone: tz });
+  return tz ?? undefined;
 }
 
 /** Push a single task's state to Google Calendar (create / update / delete). */
@@ -25,17 +34,18 @@ export async function pushTask(uid: string, taskId: string): Promise<{ status: s
   if (!task.memberIds?.includes(uid)) return { status: "forbidden" };
 
   const accessToken = await getAccessToken(conn.refreshToken);
+  const tz = task.dueTime ? await ensureTimeZone(uid, conn, accessToken) : undefined;
 
   if (task.dueDate) {
     if (task.googleEventId) {
-      const ok = await updateEvent(accessToken, task.googleEventId, task);
+      const ok = await updateEvent(accessToken, task.googleEventId, task, tz);
       if (!ok) {
-        const id = await createEvent(accessToken, task);
+        const id = await createEvent(accessToken, task, tz);
         await patchTask(task.id, { googleEventId: id });
       }
       return { status: "updated" };
     }
-    const id = await createEvent(accessToken, task);
+    const id = await createEvent(accessToken, task, tz);
     await patchTask(task.id, { googleEventId: id });
     return { status: "created" };
   }
@@ -62,6 +72,7 @@ export async function pushAllForUser(uid: string): Promise<{ status: string; pus
   const conn = await getConnection(uid);
   if (!conn) return { status: "not_connected", pushed: 0 };
   const accessToken = await getAccessToken(conn.refreshToken);
+  const tz = await ensureTimeZone(uid, conn, accessToken);
 
   const snap = await adminDb().collection("tasks").where("memberIds", "array-contains", uid).get();
   const tasks = snap.docs
@@ -72,13 +83,13 @@ export async function pushAllForUser(uid: string): Promise<{ status: string; pus
   let pushed = 0;
   for (const task of tasks) {
     if (task.googleEventId) {
-      const ok = await updateEvent(accessToken, task.googleEventId, task);
+      const ok = await updateEvent(accessToken, task.googleEventId, task, tz);
       if (!ok) {
-        const id = await createEvent(accessToken, task);
+        const id = await createEvent(accessToken, task, tz);
         await patchTask(task.id, { googleEventId: id });
       }
     } else {
-      const id = await createEvent(accessToken, task);
+      const id = await createEvent(accessToken, task, tz);
       await patchTask(task.id, { googleEventId: id });
     }
     pushed++;
@@ -113,8 +124,10 @@ export async function pullForUser(uid: string): Promise<{ status: string; change
     }
 
     const date = ev.start?.date ?? ev.start?.dateTime?.slice(0, 10);
+    const time = ev.start?.dateTime ? ev.start.dateTime.slice(11, 16) : null;
     const patch: Record<string, unknown> = {};
     if (date && date !== task.dueDate) patch.dueDate = date;
+    if (time !== (task.dueTime ?? null)) patch.dueTime = time;
     if (ev.summary && ev.summary !== task.title) patch.title = ev.summary;
     if (task.googleEventId !== ev.id) patch.googleEventId = ev.id;
     if (Object.keys(patch).length) {

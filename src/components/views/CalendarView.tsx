@@ -238,6 +238,7 @@ function Chip({ task, onOpen, overlay }: { task: Task; onOpen?: () => void; over
       )}
     >
       <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", meta.dot)} />
+      {task.dueTime && <span className="mono shrink-0 opacity-70">{task.dueTime}</span>}
       <span className="truncate">{task.title}</span>
     </div>
   );

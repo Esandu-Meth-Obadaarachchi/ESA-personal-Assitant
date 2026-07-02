@@ -54,7 +54,7 @@ export function TaskCard({
       )}
 
       <div className="mt-2.5 flex items-center gap-2">
-        {task.dueDate && <DueDateChip date={task.dueDate} status={task.status} />}
+        {task.dueDate && <DueDateChip date={task.dueDate} time={task.dueTime} status={task.status} />}
         {total > 0 && <SubtaskProgress done={done} total={total} />}
         <div className="ml-auto">
           {task.assigneeId && (

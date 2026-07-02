@@ -92,7 +92,12 @@ export function useTaskActions() {
       setStatus: applyStatus,
       setPriority: (id: string, priority: TaskPriority) => updateTask(id, { priority }),
       setDue: async (id: string, dueDate: string | null) => {
-        await updateTask(id, { dueDate });
+        // Clearing the date clears the time too.
+        await updateTask(id, dueDate ? { dueDate } : { dueDate: null, dueTime: null });
+        syncTaskToCalendar(id);
+      },
+      setDueTime: async (id: string, dueTime: string | null) => {
+        await updateTask(id, { dueTime });
         syncTaskToCalendar(id);
       },
       setTags: (id: string, tags: string[]) => updateTask(id, { tags }),
