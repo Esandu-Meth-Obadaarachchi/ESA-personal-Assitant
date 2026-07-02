@@ -11,6 +11,7 @@ import { ListView } from "@/components/views/ListView";
 import { CalendarView } from "@/components/views/CalendarView";
 import { MindMapView } from "@/components/views/MindMapView";
 import { WhiteboardView } from "@/components/views/WhiteboardView";
+import { ProjectPages } from "@/components/pages/ProjectPages";
 import { TaskDrawer } from "@/components/task/TaskDrawer";
 import { RowSkeleton } from "@/components/ui/Skeleton";
 import { Logo } from "@/components/ui/Logo";
@@ -75,7 +76,7 @@ export default function ProjectViewPage() {
       <ProjectHeader project={currentProject} tasks={tasks} tab={tab} onTab={changeTab} />
 
       <div className={cn("min-h-0 flex-1", tab === "map" || tab === "draw" ? "overflow-hidden" : "overflow-auto")}>
-        {tasksLoading ? (
+        {tasksLoading && tab !== "docs" ? (
           <div className="mx-auto max-w-4xl py-4">
             {[0, 1, 2, 3, 4].map((i) => (
               <RowSkeleton key={i} i={i} />
@@ -91,6 +92,8 @@ export default function ProjectViewPage() {
           <CalendarView onOpenTask={setSelected} />
         ) : tab === "map" ? (
           <MindMapView onOpenTask={setSelected} />
+        ) : tab === "docs" ? (
+          <ProjectPages project={currentProject} />
         ) : (
           <WhiteboardView />
         )}

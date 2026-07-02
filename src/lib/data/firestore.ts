@@ -14,7 +14,7 @@ import {
 import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase/client";
 import { PROJECT_COLORS } from "@/lib/constants";
-import type { DayPlan, Project, Task, Whiteboard, Workspace, WorkspaceMember } from "@/lib/types";
+import type { DayPlan, Page, Project, Task, Whiteboard, Workspace, WorkspaceMember } from "@/lib/types";
 import { slugifyNamespace } from "./tree";
 
 /**
@@ -332,6 +332,82 @@ export async function commitTaskMoves(moves: { id: string; order: number; parent
     batch.update(doc(requireDb(), "tasks", m.id), patch);
   });
   await batch.commit();
+}
+
+/* ------------------------------ pages ------------------------------ */
+
+/** Every page the user can see in a workspace (metadata + content). */
+export function watchPages(uid: string, workspaceId: string, cb: (p: Page[]) => void): Unsubscribe {
+  const q = query(collection(requireDb(), "pages"), where("memberIds", "array-contains", uid));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const rows = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<Page, "id">) }))
+        .filter((p) => p.workspaceId === workspaceId);
+      rows.sort((a, b) => a.order - b.order);
+      cb(rows);
+    },
+    (err) => console.error("watchPages error", err)
+  );
+}
+
+/** Live-watch a single page (for the editor). */
+export function watchPage(id: string, cb: (page: Page | null) => void): Unsubscribe {
+  return onSnapshot(
+    doc(requireDb(), "pages", id),
+    (snap) => cb(snap.exists() ? ({ id: snap.id, ...(snap.data() as Omit<Page, "id">) }) : null),
+    (err) => {
+      console.error("watchPage error", err);
+      cb(null);
+    }
+  );
+}
+
+export async function createPage(
+  workspace: Workspace,
+  opts: { projectId?: string | null; parentId?: string | null; title?: string; memberIds?: string[] } = {}
+): Promise<string> {
+  const now = Date.now();
+  const page: Omit<Page, "id"> = {
+    workspaceId: workspace.id,
+    projectId: opts.projectId ?? null,
+    parentId: opts.parentId ?? null,
+    title: opts.title ?? "Untitled",
+    icon: "",
+    content: "",
+    order: now,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: workspace.ownerId,
+    // Project pages inherit the project's members; workspace pages the whole ws.
+    memberIds: opts.memberIds ?? workspace.memberIds,
+  };
+  const ref = await addDoc(collection(requireDb(), "pages"), page);
+  return ref.id;
+}
+
+export async function updatePage(id: string, patch: Partial<Page>) {
+  await updateDoc(doc(requireDb(), "pages", id), { ...patch, updatedAt: Date.now() });
+}
+
+/** Delete a page and all of its descendant pages. */
+export async function deletePageTree(uid: string, pageId: string) {
+  const database = requireDb();
+  const snap = await getDocs(query(collection(database, "pages"), where("memberIds", "array-contains", uid)));
+  const all = snap.docs.map((d) => ({ id: d.id, parentId: d.get("parentId") as string | null, ref: d.ref }));
+  const ids = new Set<string>();
+  const walk = (pid: string) => {
+    ids.add(pid);
+    all.filter((p) => p.parentId === pid).forEach((c) => walk(c.id));
+  };
+  walk(pageId);
+  const refs = all.filter((p) => ids.has(p.id)).map((p) => p.ref);
+  for (let i = 0; i < refs.length; i += 400) {
+    const batch = writeBatch(database);
+    refs.slice(i, i + 400).forEach((ref) => batch.delete(ref));
+    await batch.commit();
+  }
 }
 
 /* ------------------------------ day planner ------------------------------ */

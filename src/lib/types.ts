@@ -167,6 +167,30 @@ export interface Whiteboard {
   updatedAt: number;
 }
 
+/**
+ * A Notion-style document. Pages nest into a tree (parentId) and belong either
+ * to a project (projectId set) or to the workspace at large (projectId null).
+ * `content` is the serialised BlockNote document (JSON string of blocks).
+ */
+export interface Page {
+  id: string;
+  workspaceId: string;
+  /** null => a workspace-level page (wiki); otherwise scoped to a project. */
+  projectId: string | null;
+  /** null => top-level page; otherwise the parent page id (page tree). */
+  parentId: string | null;
+  title: string;
+  /** Optional emoji icon. */
+  icon?: string;
+  /** Serialised BlockNote blocks (JSON). Empty string => empty doc. */
+  content: string;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
+  createdBy: string;
+  memberIds: string[];
+}
+
 /** Retrieval + chat wire types (RAG). */
 export interface RetrievedChunk {
   id: string;

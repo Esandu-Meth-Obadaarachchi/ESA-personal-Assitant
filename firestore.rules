@@ -52,6 +52,13 @@ service cloud.firestore {
       allow update, delete: if isMember(resource.data);
     }
 
+    // Notion-style pages. memberIds mirrors the workspace or the page's project.
+    match /pages/{id} {
+      allow read: if (resource == null && signedIn()) || isMember(resource.data);
+      allow create: if isMember(request.resource.data);
+      allow update, delete: if isMember(resource.data);
+    }
+
     // Share invitations are managed entirely server-side by the Admin SDK
     // (which bypasses rules), so clients get no direct access.
     match /invites/{id} {

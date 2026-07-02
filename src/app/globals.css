@@ -243,3 +243,13 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* BlockNote (Pages editor): blend into the app surface instead of Mantine's
+   default panel look. Menus/toolbars keep their own styling. */
+.sb-blocknote,
+.sb-blocknote .bn-editor {
+  background: transparent !important;
+}
+.sb-blocknote .bn-editor {
+  padding-inline: 0;
+}
