@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/lib/auth/AuthContext";
 import type { Project, Task, Workspace } from "@/lib/types";
 import {
+  createProject,
   seedNewUser,
   watchAllTasks,
   watchProjects,
@@ -26,6 +27,8 @@ interface WorkspaceState {
   workspaceTasks: Task[];
   currentWorkspace: Workspace | null;
   currentProject: Project | null;
+  /** The current workspace's catch-all Inbox project. */
+  inboxProject: Project | null;
   loading: boolean;
   seeding: boolean;
   tasksLoading: boolean;
@@ -108,7 +111,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       if (cur && projects.some((p) => p.id === cur)) return cur;
       const saved = typeof window !== "undefined" ? localStorage.getItem(LS_PROJ) : null;
       if (saved && projects.some((p) => p.id === saved)) return saved;
-      return projects[0]?.id ?? null;
+      // Prefer a real project over the Inbox as the default landing.
+      return projects.find((p) => !p.isInbox)?.id ?? projects[0]?.id ?? null;
     });
   }, [projects]);
 
@@ -143,9 +147,23 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     [allUserTasks, currentWorkspaceId]
   );
 
+  // Ensure every workspace has an Inbox (older workspaces predate this feature).
+  const inboxEnsured = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const ws = workspaces.find((w) => w.id === currentWorkspaceId);
+    if (!ws || !projects.length) return;
+    const hasInbox = projects.some((p) => p.isInbox && p.workspaceId === ws.id);
+    if (hasInbox || inboxEnsured.current.has(ws.id)) return;
+    inboxEnsured.current.add(ws.id);
+    createProject(ws, "Inbox", { isInbox: true, description: "Loose tasks not tied to a project" }).catch(
+      () => inboxEnsured.current.delete(ws.id)
+    );
+  }, [workspaces, projects, currentWorkspaceId]);
+
   const value = useMemo<WorkspaceState>(() => {
     const currentWorkspace = workspaces.find((w) => w.id === currentWorkspaceId) ?? null;
     const currentProject = projects.find((p) => p.id === currentProjectId) ?? null;
+    const inboxProject = projects.find((p) => p.isInbox) ?? null;
     return {
       workspaces,
       projects,
@@ -153,6 +171,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       workspaceTasks,
       currentWorkspace,
       currentProject,
+      inboxProject,
       loading: !wsLoaded,
       seeding,
       tasksLoading,

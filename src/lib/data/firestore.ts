@@ -112,10 +112,11 @@ export async function createWorkspace(user: User, name: string, emoji: string): 
 export async function createProject(
   workspace: Workspace,
   name: string,
-  opts: { description?: string; colorIndex?: number } = {}
+  opts: { description?: string; colorIndex?: number; isInbox?: boolean } = {}
 ): Promise<string> {
-  const color =
-    PROJECT_COLORS[(opts.colorIndex ?? Math.floor(Math.random() * PROJECT_COLORS.length)) % PROJECT_COLORS.length];
+  const color = opts.isInbox
+    ? "#6b7280"
+    : PROJECT_COLORS[(opts.colorIndex ?? Math.floor(Math.random() * PROJECT_COLORS.length)) % PROJECT_COLORS.length];
   const ref = await addDoc(collection(requireDb(), "projects"), {
     workspaceId: workspace.id,
     name,
@@ -123,6 +124,7 @@ export async function createProject(
     ragNamespace: slugifyNamespace(`${workspace.name}-${name}`),
     color,
     archived: false,
+    isInbox: opts.isInbox ?? false,
     createdAt: Date.now(),
     // denormalised for rules
     memberIds: workspace.memberIds,
@@ -287,7 +289,14 @@ export async function seedNewUser(user: User): Promise<string> {
     batch.set(ref, { name, emoji, createdAt, ...base } satisfies Omit<Workspace, "id">);
     return ref;
   };
-  const proj = (wsRef: { id: string }, name: string, description: string, color: string, wsName: string) => {
+  const proj = (
+    wsRef: { id: string },
+    name: string,
+    description: string,
+    color: string,
+    wsName: string,
+    isInbox = false
+  ) => {
     const ref = doc(collection(database, "projects"));
     batch.set(ref, {
       workspaceId: wsRef.id,
@@ -296,6 +305,7 @@ export async function seedNewUser(user: User): Promise<string> {
       ragNamespace: slugifyNamespace(`${wsName}-${name}`),
       color,
       archived: false,
+      isInbox,
       createdAt: now,
       memberIds: [user.uid],
     });
@@ -338,6 +348,8 @@ export async function seedNewUser(user: User): Promise<string> {
 
   // --- Office ---
   const office = ws("Office", "💼", now);
+  const officeInbox = proj(office, "Inbox", "Loose tasks not tied to a project", "#6b7280", "Office", true);
+  task(office, officeInbox, "Reply to the BMPC organisers", { priority: "med", dueDate: isoOffset(1) });
   const solar = proj(office, "SLT Solar Dashboard", "Unified monitoring for 19+ solar sites", "#f5c518", "Office");
   const report = task(office, solar, "Ship the monthly performance report", {
     status: "in_progress",
@@ -356,6 +368,7 @@ export async function seedNewUser(user: User): Promise<string> {
 
   // --- Freelance ---
   const freelance = ws("Freelance", "🚀", now + 1);
+  proj(freelance, "Inbox", "Loose tasks not tied to a project", "#6b7280", "Freelance", true);
   const gradify = proj(freelance, "Gradify", "Question bank, mock exams, AI marking", "#4ade80", "Freelance");
   const foundation = task(freelance, gradify, "Foundation phase build", { status: "in_progress", priority: "high", dueDate: isoOffset(3), tags: ["milestone"] });
   task(freelance, gradify, "Auth + roles (teacher/student)", { parentRef: foundation, status: "todo", priority: "high" });
@@ -364,6 +377,7 @@ export async function seedNewUser(user: User): Promise<string> {
 
   // --- LeadX ---
   const leadx = ws("LeadX", "⚡", now + 2);
+  proj(leadx, "Inbox", "Loose tasks not tied to a project", "#6b7280", "LeadX", true);
   const pipeline = proj(leadx, "Pipeline", "Lead generation and outreach", "#f472b6", "LeadX");
   task(leadx, pipeline, "Follow up on Predictiv AI conversation", { status: "todo", priority: "high", dueDate: isoOffset(0) });
   task(leadx, pipeline, "Prep Cresco agri-tech application", { status: "todo", priority: "med", dueDate: isoOffset(7) });
