@@ -113,6 +113,21 @@ export interface TaskNode extends Task {
   depth: number;
 }
 
+/**
+ * A per-user daily planner note ("small notebook"). One doc per user per day,
+ * keyed `${uid}_${date}`. Not tied to any workspace — it is your personal
+ * schedule for the day, synced across devices.
+ */
+export interface DayPlan {
+  id: string;
+  uid: string;
+  /** yyyy-mm-dd */
+  date: string;
+  content: string;
+  updatedAt: number;
+  memberIds: string[];
+}
+
 /** Retrieval + chat wire types (RAG). */
 export interface RetrievedChunk {
   id: string;
