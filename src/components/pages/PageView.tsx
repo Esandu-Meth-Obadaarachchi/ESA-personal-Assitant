@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, FileText, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Plus, Trash2 } from "lucide-react";
 import type { PartialBlock } from "@blocknote/core";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
@@ -40,10 +40,16 @@ export function PageView({ id }: { id: string }) {
   const loadedRef = useRef(false);
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Latest not-yet-persisted values, flushed on unmount so navigating away
+  // (e.g. Back within the debounce window) never drops your edits.
+  const pendingContent = useRef<string | null>(null);
+  const pendingTitle = useRef<string | null>(null);
 
   // Load the page once, then keep watching for meta (title from other devices).
   useEffect(() => {
     loadedRef.current = false;
+    pendingContent.current = null;
+    pendingTitle.current = null;
     setPage(undefined);
     setInitial(null);
     const unsub = watchPage(id, (p) => {
@@ -68,20 +74,33 @@ export function PageView({ id }: { id: string }) {
       unsub();
       if (contentTimer.current) clearTimeout(contentTimer.current);
       if (titleTimer.current) clearTimeout(titleTimer.current);
+      // Flush anything still pending to Firestore before we tear down.
+      const patch: Partial<Page> = {};
+      if (pendingContent.current !== null) patch.content = pendingContent.current;
+      if (pendingTitle.current !== null) patch.title = pendingTitle.current.trim() || "Untitled";
+      if (Object.keys(patch).length) void updatePage(id, patch);
     };
   }, [id]);
 
   const saveContent = (json: string) => {
+    pendingContent.current = json;
     if (contentTimer.current) clearTimeout(contentTimer.current);
     contentTimer.current = setTimeout(() => {
-      updatePage(id, { content: json }).then(() => setSavedAt(Date.now()));
+      const v = pendingContent.current;
+      if (v === null) return;
+      pendingContent.current = null;
+      updatePage(id, { content: v }).then(() => setSavedAt(Date.now()));
     }, 700);
   };
 
   const onTitle = (v: string) => {
     setTitle(v);
+    pendingTitle.current = v;
     if (titleTimer.current) clearTimeout(titleTimer.current);
-    titleTimer.current = setTimeout(() => updatePage(id, { title: v.trim() || "Untitled" }), 500);
+    titleTimer.current = setTimeout(() => {
+      pendingTitle.current = null;
+      updatePage(id, { title: v.trim() || "Untitled" });
+    }, 500);
   };
 
   const setPageIcon = (e: string) => {
@@ -129,6 +148,7 @@ export function PageView({ id }: { id: string }) {
 
   const project = page.projectId ? projects.find((p) => p.id === page.projectId) : null;
   const parent = page.parentId ? pages.find((p) => p.id === page.parentId) : null;
+  const children = pages.filter((p) => p.parentId === id).sort((a, b) => a.order - b.order);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -205,6 +225,45 @@ export function PageView({ id }: { id: string }) {
             onChange={saveContent}
             theme={theme === "light" ? "light" : "dark"}
           />
+
+          {/* Sub-pages — clickable links to nested pages (Notion-style). */}
+          <div className="mt-8 border-t border-border pt-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-2xs font-semibold uppercase tracking-wider text-text-faint">
+                Sub-pages{children.length > 0 && ` · ${children.length}`}
+              </span>
+              <button
+                onClick={addSubpage}
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs text-text-faint hover:bg-surface-2 hover:text-text"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add
+              </button>
+            </div>
+            {children.length === 0 ? (
+              <button
+                onClick={addSubpage}
+                className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2.5 text-left text-[13px] text-text-faint transition-colors hover:border-border-strong hover:text-text-muted"
+              >
+                <Plus className="h-4 w-4" /> Add a sub-page
+              </button>
+            ) : (
+              <div className="space-y-1">
+                {children.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => router.push(`/pages/${c.id}`)}
+                    className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-surface-2/40 px-3 py-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-2"
+                  >
+                    <span className="text-base leading-none">{c.icon || "📄"}</span>
+                    <span className="flex-1 truncate text-[13.5px] font-medium text-text">
+                      {c.title || "Untitled"}
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-text-faint" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
