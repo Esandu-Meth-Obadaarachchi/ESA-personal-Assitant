@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Loader2, Mail, Shield, Trash2, UserPlus } from "lucide-react";
+import { Check, Copy, Loader2, Mail, Shield, Trash2, UserPlus } from "lucide-react";
 import { authedFetch, postJSON } from "@/lib/api";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import type { Invite, MemberRole, Workspace, WorkspaceMember } from "@/lib/types";
@@ -41,6 +41,19 @@ export function ShareDialog({ workspace, open, onClose }: { workspace: Workspace
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<MemberRole>("member");
   const [scope, setScope] = useState<string[] | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  // We don't auto-send email (no mail provider yet). Instead the inviter copies
+  // a ready-made message and sends it however they like; the teammate joins the
+  // moment they sign in with that Google email.
+  const copyInvite = (to: string) => {
+    const url = typeof window !== "undefined" ? window.location.origin : "https://esa-ai-personal-assistant.netlify.app";
+    const msg = `You're invited to join "${workspace.name}" on ESA AI.\nOpen ${url} and sign in with Google using ${to} — you'll be added automatically.`;
+    navigator.clipboard?.writeText(msg).then(() => {
+      setCopied(to);
+      setTimeout(() => setCopied((c) => (c === to ? null : c)), 2200);
+    });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,8 +94,10 @@ export function ShareDialog({ workspace, open, onClose }: { workspace: Workspace
 
   const sendInvite = async () => {
     if (!email.trim()) return;
-    const ok = await act({ action: "invite", email: email.trim(), role, scope });
+    const to = email.trim();
+    const ok = await act({ action: "invite", email: to, role, scope });
     if (ok) {
+      copyInvite(to); // put the invite message on the clipboard, ready to send
       setEmail("");
       setRole("member");
       setScope(null);
@@ -185,6 +200,21 @@ export function ShareDialog({ workspace, open, onClose }: { workspace: Workspace
                         {roleLabel(inv.role)} · {scopeSummary(inv.scope)}
                       </div>
                     </div>
+                    <button
+                      onClick={() => copyInvite(inv.email)}
+                      className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-2 py-1 text-2xs text-text-muted hover:text-text"
+                      title="Copy invite message to send"
+                    >
+                      {copied === inv.email ? (
+                        <>
+                          <Check className="h-3 w-3 text-accent" /> Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" /> Copy invite
+                        </>
+                      )}
+                    </button>
                     {canManage && (
                       <button
                         onClick={() => act({ action: "revokeInvite", inviteId: inv.id })}
@@ -249,9 +279,13 @@ export function ShareDialog({ workspace, open, onClose }: { workspace: Workspace
 
                 <ScopeSelector value={scope} onChange={setScope} projects={realProjects} />
 
-                <div className="flex justify-end">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-2xs leading-snug text-text-faint">
+                    Creates the invite and copies a message to send them. They join
+                    automatically when they sign in with that Google email.
+                  </p>
                   <Button variant="primary" onClick={sendInvite} disabled={!email.trim() || busy}>
-                    <UserPlus className="h-3.5 w-3.5" /> Send invite
+                    <UserPlus className="h-3.5 w-3.5" /> {copied ? "Copied!" : "Create invite"}
                   </Button>
                 </div>
               </div>
