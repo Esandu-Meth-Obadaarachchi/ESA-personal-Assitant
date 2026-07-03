@@ -1,6 +1,6 @@
 # Data model
 
-Three top-level Firestore collections. Flat (not deeply nested) so security rules and `array-contains` isolation queries stay simple. Every doc carries `memberIds` for isolation.
+Flat top-level Firestore collections (not deeply nested) so security rules and `array-contains` isolation queries stay simple. Every user-facing doc carries `memberIds` for isolation: `workspaces`, `projects`, `tasks`, `pages`, `whiteboards`, `dayPlans`. `invites` is server-only. Two more (`calendarConnections`, `calendarOAuthStates`) are server-only and never in the rules.
 
 ## Collections
 
@@ -10,9 +10,10 @@ name: string
 emoji: string
 ownerId: string
 memberIds: string[]         # uids with access (isolation key)
-members: WorkspaceMember[]  # { uid, name, email, photoURL, role }
+members: WorkspaceMember[]  # { uid, name, email, photoURL, role, scope }
 createdAt: number
 ```
+`WorkspaceMember.role` is `owner | admin | member | client-viewer`. `scope` is `string[] | null` — `null` means the whole workspace, an array means access is limited to those project ids. `members` is the source of truth for sharing; project/task `memberIds` are re-derived from it by `recomputeMembership` (`lib/share/server.ts`).
 
 ### `projects/{id}`
 ```
@@ -49,11 +50,53 @@ createdBy: string
 memberIds: string[]         # isolation
 ```
 
+### `pages/{id}`  (Notion-style documents)
+```
+workspaceId: string
+projectId: string | null    # null = workspace-level page; else a project doc
+parentId: string | null     # null = top-level; else nested subpage (page tree)
+title: string
+icon: string                # emoji, optional
+content: string             # serialised BlockNote blocks (JSON string)
+order, createdAt, updatedAt: number
+createdBy: string
+memberIds: string[]         # workspace members, or the project's members when scoped
+```
+
+### `whiteboards/{projectId}`  (Excalidraw scene, one per project)
+```
+projectId: string
+scene: string               # serialised Excalidraw elements + files (JSON)
+updatedAt: number
+memberIds: string[]         # mirrors the project
+```
+
+### `dayPlans/{uid}_{date}`  (per-user day planner notebook)
+```
+uid: string
+date: string                # yyyy-mm-dd
+content: string             # free text
+updatedAt: number
+memberIds: string[]         # always [uid]
+```
+
+### `invites/{id}`  (server-only, `allow read,write: if false`)
+```
+workspaceId, workspaceName, workspaceEmoji: string
+email: string               # lowercased; the invitee's Google email
+role: MemberRole
+scope: string[] | null      # project ids, or null for whole-workspace
+invitedByUid, invitedByName: string
+status: "pending" | "accepted"
+createdAt: number
+```
+Written/read only by `lib/share/server.ts` (admin). On the invitee's first sign-in, `WorkspaceContext` POSTs `/api/members {action:"accept"}`, which claims every pending invite matching their email and adds them to the workspace.
+
 > Server-only collections (never in `firestore.rules`, so clients can't read
 > them): `calendarConnections/{uid}` (Google refresh token + sync state) and
 > `calendarOAuthStates/{state}` (short-lived OAuth handshake).
 
-The task tree is stored flat and assembled client-side (`lib/data/tree.ts` -> `buildTree`). Subtasks nest arbitrarily deep via `parentId`.
+The task tree is stored flat and assembled client-side (`lib/data/tree.ts` -> `buildTree`). Subtasks nest arbitrarily deep via `parentId`. The page tree works the same way via `Page.parentId`.
 
 ## Isolation
 
@@ -61,14 +104,12 @@ The task tree is stored flat and assembled client-side (`lib/data/tree.ts` -> `b
 
 ## Queries + indexes
 
-Every query is single-field equality or `array-contains` and is sorted client-side, so **no composite indexes are needed** (`firestore.indexes.json` is empty by design):
+Every query is single-field equality or `array-contains` and sorted/filtered client-side, so **no composite indexes are needed** (`firestore.indexes.json` is empty by design). This includes the sharing queries on the server: `invites where workspaceId == x` (or `where email == y`) then filter `status`/`email` in memory — deliberately not multi-`where`, to avoid ever needing a composite index.
 
-- `workspaces where memberIds array-contains uid`
-- `projects where workspaceId == x`
-- `tasks where projectId == x`
-- `tasks where workspaceId == x` (agent + standup)
-- `tasks where memberIds array-contains uid` (cross-project standup)
+- `workspaces / projects / pages where memberIds array-contains uid` (then filter by workspace client-side)
+- `tasks where memberIds array-contains uid` (then filter by project/workspace)
+- `pages/{id}`, `whiteboards/{projectId}`, `dayPlans/{uid}_{date}` — direct doc reads
 
 ## Real-time
 
-The client uses `onSnapshot` watchers (`lib/data/firestore.ts`) surfaced through `WorkspaceContext`. Every mutation reflects instantly across open tabs and views.
+The client uses `onSnapshot` watchers (`lib/data/firestore.ts`) surfaced through `WorkspaceContext` (workspaces, projects, tasks, `allTasks`, pages, inbox). Every mutation reflects instantly across open tabs and views. The client forces **long-polling** transport (`lib/firebase/client.ts`) to avoid a WebChannel watch-stream assertion crash that the day planner and whiteboard listeners triggered.

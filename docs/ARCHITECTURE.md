@@ -18,10 +18,14 @@ Next.js API routes (server, Node runtime)
   /api/chat    requireUser -> loadWorkspace -> runAgent (Claude tool loop) ──┘
   /api/ingest  requireUser -> loadProject -> parse -> chunk -> Voyage -> Pinecone
   /api/related requireUser -> loadProject -> Voyage query -> Pinecone query
+  /api/members requireUser -> lib/share/server.ts (invite/accept/role/scope/remove)
+  /api/calendar/* Google OAuth + two-way sync
         │
         ▼
-  Anthropic (Claude)   Voyage (embeddings)   Pinecone (vectors)
+  Anthropic (Claude)   Voyage (embeddings)   Pinecone (vectors)   Google Calendar
 ```
+
+The Firestore client is initialised with **forced long-polling** (`lib/firebase/client.ts`) and `reactStrictMode` is off, both to avoid a WebChannel watch-stream internal-assertion crash. Client-hit routes avoid ad-blockable words in their path (hence `/api/members`, not `/api/share`).
 
 ## Request flows
 
@@ -31,10 +35,14 @@ Next.js API routes (server, Node runtime)
 
 **Ingestion**: multipart upload (or pasted text) -> parse (pdf-parse / mammoth / raw) -> recursive chunker -> Voyage document embeddings -> Pinecone upsert into the project's namespace.
 
+**Sharing**: managers POST `/api/members`; `lib/share/server.ts` edits `workspace.members[]` (role + scope) via admin, then `recomputeMembership` re-derives `memberIds` on every project and task from the members' scopes and batch-writes them. Invitees claim pending invites by email on first sign-in, and the shared workspace then streams in through their `watchWorkspaces` listener. Client never touches `memberIds`.
+
+**Pages**: `PageView` loads a page once, renders the BlockNote editor (`BlockEditor`, dynamic `ssr:false`), and autosaves the serialised blocks with a debounce. The whiteboard and day planner follow the same load-once + debounced-save pattern.
+
 ## Route groups
 
-- `(auth)` — unauthenticated (`/login`).
-- `(app)` — auth-guarded; layout redirects to `/login` when signed out and wraps `WorkspaceProvider` + `AppFrame` (sidebar + content + seeding overlay).
+- `(auth)` — unauthenticated (`/login`, which doubles as the marketing/landing surface).
+- `(app)` — auth-guarded; layout redirects to `/login` when signed out and wraps `WorkspaceProvider` + `AppFrame` (collapsible sidebar + content + seeding overlay). Screens: project view (`/`), `/today`, `/overview`, `/workspaces`, `/pages` + `/pages/[id]`, `/agent`, `/knowledge`.
 
 ## Why Next.js (not plain Vite React)
 

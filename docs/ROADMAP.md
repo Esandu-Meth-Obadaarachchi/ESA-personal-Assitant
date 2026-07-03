@@ -2,7 +2,7 @@
 
 From `second-brain-app-spec.md` §5. This build delivers a solid runnable foundation (Phase 1 + auth + the Claude agent/RAG core). Later phases are scaffolded to slot into the server boundary.
 
-**Backend is live.** Firebase project `second-brain-fbf414` is provisioned: Google auth enabled, Firestore in `asia-south1` with rules deployed, Admin SDK key set. The task manager runs end to end today. The agent/RAG needs `ANTHROPIC_API_KEY` + `VOYAGE_API_KEY` + `PINECONE_API_KEY` (still blank). See `docs/SETUP.md`.
+**Live in production** at https://esa-ai-personal-assistant.netlify.app (Netlify, manual deploys, no CI/CD yet) under the product name **ESA AI**. Firebase project `second-brain-fbf414`: Google auth enabled (localhost + the Netlify domain authorised), Firestore in `asia-south1`, Admin SDK + AI keys set. Remember `firebase deploy --only firestore:rules` after any rules change — Netlify does not deploy them. See `docs/DEPLOYMENT.md`.
 
 | Phase | Scope | Status |
 |---|---|---|
@@ -12,7 +12,13 @@ From `second-brain-app-spec.md` §5. This build delivers a solid runnable founda
 | — | Daily AI standup + smart linking | **Done** |
 | 2 | Google Calendar two-way sync | **Done** — OAuth (offline), push task->event, watch-channel + webhook reverse sync, "Sync now". Needs a Google OAuth client + (for live reverse) a public webhook URL. See `docs/CALENDAR.md` |
 | 4 | WhatsApp Cloud API bot | Not started — reuses `runAgent` behind a webhook route |
-| 5 | Time tracking, recurring tasks, templates, roles | **Time tracking + recurring tasks done**; roles modelled (`WorkspaceMember.role`); templates not started |
+| 5 | Time tracking, recurring tasks, templates, roles | **Time tracking + recurring tasks done**; **sharing done** (invite by email, owner/admin/member/viewer roles, whole-workspace or per-project scope — `lib/share/server.ts` + `/api/members`); templates not started |
+| — | Mind map view (Map) | **Done** — React Flow auto-laid-out task tree, click to open |
+| — | Whiteboard per project (Draw) | **Done** — Excalidraw scene saved per project |
+| — | Today + day planner | **Done** — `/today`: due-today across all workspaces + a per-user notebook synced to Firestore |
+| — | Pages (Notion-style docs) | **Done** — BlockNote block editor, workspace + project level, nestable page tree, `/pages` |
+| — | Landing page, mobile-responsive shell, motion polish | **Done** |
+| — | Production hosting | **Done** — Netlify manual deploys; `docs/DEPLOYMENT.md` |
 | — | Single-page doc export (Phase 1) | **Done** — printable project + task-tree, PDF via print |
 | — | Time-of-day on tasks | **Done** — `dueTime`; timed calendar events |
 | — | Inbox (tasks without a project) | **Done** — per-workspace Inbox + sidebar quick-capture |
