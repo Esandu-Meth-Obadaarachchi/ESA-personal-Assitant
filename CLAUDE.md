@@ -4,11 +4,14 @@ Read this first in any session. It is the map of the codebase and the rules for 
 
 ## What this is
 
-An AI-native project + knowledge manager. Notion-meets-Linear feel: dense, dark, keyboard-friendly. Three pillars on one backend:
+Shipped as **ESA AI — Your Personal Assistant** (product name; the codebase/package is still `second-brain`). An AI-native project + knowledge manager. Notion-meets-Linear feel: dense, dark, keyboard-friendly. Pillars on one backend:
 
-1. **Execution** — Workspace -> Project -> Task -> Subtask (recursive). Four views: Tree, Kanban, List, Calendar.
+1. **Execution** — Workspace -> Project -> Task -> Subtask (recursive). Seven per-project views: Tree, Board (Kanban), List, Calendar, Map (React Flow mind map), Draw (Excalidraw whiteboard) and Docs (project pages). List/Board only ever show top-level tasks with subtasks nested underneath.
 2. **Knowledge** — per-project RAG. Upload docs, they are chunked, embedded (Voyage) and stored in Pinecone.
 3. **Agent** — a Claude tool-calling agent ("the brain") that reads and writes tasks and searches knowledge. Plus a daily standup.
+4. **Today** (`/today`) — every task due today across *all* workspaces, plus a per-user day planner (notebook) synced to Firestore.
+5. **Pages** — Notion-style block documents (BlockNote) at workspace or project level, nestable into a page tree.
+6. **Sharing** — invite teammates by email with owner/admin/member/viewer roles, scoped to the whole workspace or specific projects.
 
 Full product intent is in `second-brain-app-spec.md` and `second-brain-design-brief.md` at the repo root (source material — not code).
 
@@ -19,25 +22,30 @@ Full product intent is in `second-brain-app-spec.md` and `second-brain-design-br
 | Framework | Next.js 14.2 (App Router) + TypeScript | `src/` dir, `@/*` path alias |
 | Styling | Tailwind CSS 3.4, CSS-variable tokens | dark default, light fallback |
 | Auth | Firebase Auth (Google) | client SDK; server verifies ID tokens |
-| Database | Cloud Firestore | real-time `onSnapshot`, per-workspace isolation |
+| Database | Cloud Firestore | real-time `onSnapshot`, per-workspace isolation. **Client init forces long-polling** (`initializeFirestore` + `experimentalForceLongPolling` in `lib/firebase/client.ts`) to dodge a WebChannel watch-stream assertion crash |
 | Agent + generation | Anthropic Claude (`claude-opus-4-8`) | tool-use loop, server-only |
 | Embeddings | Voyage AI (`voyage-3.5`, 1024-dim) | Claude has no embedding model |
 | Vector store | Pinecone | one index, namespace per project |
 | Drag + drop | @dnd-kit | Kanban + Calendar |
+| Mind map | reactflow (v11) | Map view — auto-laid-out task tree |
+| Whiteboard | @excalidraw/excalidraw | Draw view — one scene per project, saved to Firestore |
+| Pages editor | BlockNote (`@blocknote/*` v0.31, React-18 compatible) | Notion-style block editor; loaded via `ssr:false` dynamic import |
+| Hosting | Netlify (`@netlify/plugin-nextjs`) | manual deploys, no CI/CD yet |
 
-Model + RAG rationale: `docs/RAG.md`. Data model: `docs/DATA_MODEL.md`. Visual system: `docs/DESIGN_SYSTEM.md`. Architecture: `docs/ARCHITECTURE.md`. Setup: `docs/SETUP.md`. Google Calendar sync: `docs/CALENDAR.md`. Roadmap + phase status: `docs/ROADMAP.md`.
+`reactStrictMode` is **off** in `next.config.js` on purpose — StrictMode's dev double-mount rapidly re-subscribes Firestore listeners and trips the same WebChannel assertion.
 
-## Live instance (provisioned)
+Model + RAG rationale: `docs/RAG.md`. Data model: `docs/DATA_MODEL.md`. Visual system: `docs/DESIGN_SYSTEM.md`. Architecture: `docs/ARCHITECTURE.md`. Setup: `docs/SETUP.md`. Google Calendar sync: `docs/CALENDAR.md`. Deployment: `docs/DEPLOYMENT.md`. Roadmap + phase status: `docs/ROADMAP.md`.
 
-A working Firebase backend is already provisioned and wired via `.env.local` (untracked):
+## Live instance (provisioned + deployed)
 
+- **Production:** https://esa-ai-personal-assistant.netlify.app (Netlify site `esa-ai-personal-assistant`, team `eobadaarachchi`/"Shona"). Deploy manually with `netlify deploy --build --prod`. Env vars live on the Netlify site (imported from `.env.local`, with the URL-based ones repointed to the prod domain).
 - **Firebase project:** `second-brain-fbf414` (owner `eobadaarachchi@gmail.com`), pinned in `.firebaserc`.
-- **Auth:** Google sign-in enabled. Signed-in users are seeded with Office / Freelance / LeadX workspaces on first login.
-- **Firestore:** created in `asia-south1`, security rules deployed. Live data confirmed (workspaces/projects/tasks tied to the owner uid).
-- **Admin SDK:** service-account key (`firebase-adminsdk-fbsvc@…`) generated and set in `.env.local`, verified working — so the API routes' auth (`requireUser`) and agent task writes are ready.
-- **Still blank (add when doing the agent):** `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `PINECONE_API_KEY`. Until these exist, the task manager is fully functional; `/api/chat`, `/api/ingest`, `/api/related` return a clear error.
+- **Auth:** Google sign-in enabled. Authorised domains include `localhost` and `esa-ai-personal-assistant.netlify.app`. Signed-in users are seeded with Office / Freelance / LeadX workspaces on first login.
+- **Firestore:** `asia-south1`. **Rules must be redeployed after any change** (`firebase deploy --only firestore:rules`) — hosting on Netlify does not touch them. New collections (`dayPlans`, `whiteboards`, `pages`) will 403 until the rules are live.
+- **Admin SDK:** service-account key set in `.env.local` + Netlify — powers `requireUser`, agent writes and all sharing writes.
+- **AI keys:** `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `PINECONE_API_KEY` are configured. If ever blank, everything except `/api/chat`, `/api/ingest`, `/api/related` still works.
 
-Setup for a fresh instance from scratch: `docs/SETUP.md`.
+Setup for a fresh instance from scratch: `docs/SETUP.md`. Hosting details: `docs/DEPLOYMENT.md`.
 
 ## Directory map
 
@@ -45,45 +53,53 @@ Setup for a fresh instance from scratch: `docs/SETUP.md`.
 src/
   app/
     layout.tsx                 Root: AuthProvider + ThemeProvider, theme-flash guard
-    (auth)/login/page.tsx      Google sign-in
+    (auth)/login/page.tsx      Google sign-in + interactive marketing/landing content
     (app)/layout.tsx           Auth guard -> WorkspaceProvider -> AppFrame
-    (app)/page.tsx             Project View (Tree/Board/List/Calendar + task drawer)
-    (app)/overview/page.tsx    Per-workspace dashboard (project cards, status, attention)
+    (app)/page.tsx             Project View (Tree/Board/List/Calendar/Map/Draw/Docs + task drawer)
+    (app)/today/page.tsx       Today: due-today across all workspaces + day planner notebook
+    (app)/overview/page.tsx    Per-workspace dashboard (project cards, status, attention, Share)
+    (app)/workspaces/page.tsx  All-workspaces portfolio board
+    (app)/pages/page.tsx       Pages index (docs grouped by workspace + project)
+    (app)/pages/[id]/page.tsx  Single page -> <PageView> block editor
     (app)/agent/page.tsx       Standup + chat surface
     (app)/knowledge/page.tsx   Document / note ingestion
-    api/chat/route.ts          Claude agent (POST)
-    api/ingest/route.ts        parse -> chunk -> embed -> Pinecone upsert (POST)
-    api/related/route.ts       Smart linking: related knowledge for a task (POST)
-    api/calendar/*             Google Calendar OAuth + two-way sync (connect, callback,
-                               status, disconnect, push, sync, webhook, events overlay)
+    api/chat|ingest|related    Agent, RAG ingest, smart-linking (POST)
+    api/members/route.ts       Sharing: list/invite/accept/update/remove (POST/GET).
+                               NB named /api/members, NOT /api/share — ad-blockers block "share" URLs.
+    api/calendar/*             Google Calendar OAuth + two-way sync
   components/
-    ui/        Design-system primitives (Button, Avatar, Dropdown, Modal, chips...)
-    shell/     Sidebar, WorkspaceSwitcher, AppFrame
+    ui/        Design-system primitives (Button, Avatar, Dropdown, Modal, chips...).
+               Dropdown renders in a body portal (fixed, viewport-clamped, flips up).
+    shell/     Sidebar (collapsible), WorkspaceSwitcher, AppFrame, ShareDialog
     task/      TaskRow, TaskCard, TaskDrawer, Pickers, TimeTracker
-    views/     TreeView, KanbanBoard, ListView, CalendarView, DayDetail
+    views/     TreeView, KanbanBoard, ListView, CalendarView, DayDetail,
+               MindMapView (React Flow), WhiteboardView (Excalidraw)
+    pages/     PageView, BlockEditor (BlockNote, ssr:false), ProjectPages (Docs tab)
     project/   ProjectHeader (tabs + stats + export), PrintView, CalendarSync
     agent/     StandupCard, AgentMessage, cards
   lib/
-    firebase/  client.ts (browser), admin.ts (server, requireUser)
-    auth/      AuthContext
-    theme/     ThemeContext
-    data/      firestore.ts, WorkspaceContext (tasks + workspaceTasks + inboxProject),
+    firebase/  client.ts (browser, long-polling), admin.ts (server, requireUser)
+    auth/ theme/  AuthContext, ThemeContext
+    data/      firestore.ts (tasks, projects, pages, dayPlans, whiteboards, ensureInbox),
+               WorkspaceContext (tasks, workspaceTasks, allTasks, pages, inboxProject),
                useTaskActions, tree.ts, standup.ts
-    ai/        voyage.ts, pinecone.ts, anthropic.ts, chunker.ts, parse.ts,
-               persona.ts, tools.ts, agent.ts, server.ts
-    google/    calendar.ts (OAuth + Calendar v3), store.ts (server token store), sync.ts
+    share/     server.ts (admin-side membership: invites, roles, per-project scope, recompute)
+    ai/        voyage, pinecone, anthropic, chunker, parse, persona, tools, agent, server
+    google/    calendar.ts, store.ts, sync.ts
     types.ts, constants.ts, date.ts, utils.ts, api.ts, export.ts
-firestore.rules / firestore.indexes.json / firebase.json
+firestore.rules / firestore.indexes.json / firebase.json / netlify.toml
 ```
 
 ## Non-negotiable rules
 
 1. **Secrets stay server-side.** `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `PINECONE_API_KEY` and the Firebase Admin key are only ever read inside `src/app/api/**` or `src/lib/ai/**` / `src/lib/firebase/admin.ts`. Never import those into a client component. Only `NEXT_PUBLIC_*` Firebase values reach the browser.
 2. **All task/project/workspace mutations go through the data layer.** Client code calls `useTaskActions()` or the functions in `src/lib/data/firestore.ts` — never `updateDoc` inline in a component. The agent (server) writes through `firebase-admin` in `src/lib/ai/tools.ts`.
-3. **Per-workspace isolation is enforced by `memberIds`.** Every workspace/project/task doc carries `memberIds`. `firestore.rules` gates every read/write on `request.auth.uid in memberIds`. When you add a doc type, add `memberIds` and a rule.
-4. **Colours come from tokens.** Use the Tailwind semantic tokens (`bg`, `surface`, `accent`, `text-muted`, `danger`...). Do not hardcode hex in components. New colours go in `globals.css` + `tailwind.config.ts`.
-5. **Keep the tree/list/board/calendar consistent.** They render the same `Task` data; a field added to one view's editing surface should be honoured everywhere it is shown.
-6. **Never push straight to `main` on a real deployment.** Feature branch + PR. (Local dev on `main` is fine.)
+3. **Per-workspace isolation is enforced by `memberIds`.** Every `workspaces`/`projects`/`tasks`/`pages`/`whiteboards`/`dayPlans` doc carries `memberIds`. `firestore.rules` gates every read/write on `request.auth.uid in memberIds`. When you add a doc type, add `memberIds` and a rule. Docs that may not exist yet (a fresh page/whiteboard/dayPlan) use `allow read: if (resource == null && signedIn()) || isMember(resource.data)` so the empty state loads instead of 403-ing.
+4. **Sharing/membership writes go through the server.** All membership changes (invite, accept, role, scope, remove) run in `lib/share/server.ts` via `firebase-admin` and call `recomputeMembership`, which re-derives every project/task `memberIds` from `workspace.members[].scope`. Never edit `memberIds` from the client. `invites` is server-only (`allow read,write: if false`).
+5. **Colours come from tokens.** Use the Tailwind semantic tokens (`bg`, `surface`, `accent`, `text-muted`, `danger`...). Do not hardcode hex in components. New colours go in `globals.css` + `tailwind.config.ts`.
+6. **Keep the task views consistent.** Tree/List/Board/Calendar/Map render the same `Task` data; a field added to one editing surface should be honoured everywhere. List/Board show only top-level tasks (subtasks nest under their parent).
+7. **Never name a client-hit route with an ad-blockable word.** `/api/share` was silently killed by ad-blockers (`ERR_BLOCKED_BY_CLIENT`); it is now `/api/members`. Avoid `share`, `track`, `ad`, `analytics`, `collect` in public route paths.
+8. **Never push straight to `main` on a real deployment.** Feature branch + PR. (Local dev on `main` is fine.) The auto-approver enforces this.
 
 ## How the agent works (important)
 
@@ -117,10 +133,13 @@ npm run lint       # next lint
 
 | Task | Start in |
 |---|---|
-| A new task field | `lib/types.ts` -> `firestore.ts` + `useTaskActions` -> the four views + `TaskDrawer` |
+| A new task field | `lib/types.ts` -> `firestore.ts` + `useTaskActions` -> the task views + `TaskDrawer` |
 | A new agent tool | `lib/ai/tools.ts` (schema + executor) -> it is auto-wired into the loop |
-| A new view | `components/views/` -> add a tab in `project/ProjectHeader.tsx` + `app/(app)/page.tsx` |
+| A new project view | `components/views/` -> add a `ViewTab` in `project/ProjectHeader.tsx` + a branch in `app/(app)/page.tsx` |
+| Pages / block editor | `components/pages/` (PageView, BlockEditor, ProjectPages), `firestore.ts` page fns, `pages` rule |
+| Sharing / roles | `lib/share/server.ts` + `api/members/route.ts` + `components/shell/ShareDialog.tsx` |
 | Change the look | `src/app/globals.css` tokens + `tailwind.config.ts`, then `docs/DESIGN_SYSTEM.md` |
-| A new doc type / collection | `lib/types.ts`, `firestore.ts`, and add a rule in `firestore.rules` |
+| A new doc type / collection | `lib/types.ts`, `firestore.ts`, add a rule in `firestore.rules`, then `firebase deploy --only firestore:rules` |
+| Deploy | `netlify deploy --build --prod`; rules separately via Firebase CLI. See `docs/DEPLOYMENT.md` |
 
 Also see `.claude/skills/` for the design-system, component-builder and firestore-patterns skills, and `.claude/agents/` for specialised subagents.

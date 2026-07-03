@@ -1,10 +1,11 @@
 <div align="center">
 
-# ◭ Second Brain
+# ◭ ESA AI — Your Personal Assistant
 
 **An AI-native project + knowledge manager. Notion-meets-Linear, powered by Claude.**
 
-Projects · tasks · a knowledge base, and a Claude agent that reasons across all of it.
+Projects · tasks · docs · a knowledge base, and a Claude agent that reasons across all of it.
+Live at **https://esa-ai-personal-assistant.netlify.app** (codebase name: `second-brain`).
 
 </div>
 
@@ -12,14 +13,16 @@ Projects · tasks · a knowledge base, and a Claude agent that reasons across al
 
 ## What it does
 
-- **Execution** — Workspaces (per business) → Projects → Tasks → recursive Subtasks. Four synced views: **Tree**, **Kanban** (drag between columns), **List**, **Calendar** (drag to reschedule).
+- **Execution** — Workspaces (per business) → Projects → Tasks → recursive Subtasks. Seven synced views: **Tree**, **Board** (drag between columns), **List**, **Calendar** (drag to reschedule), **Map** (React Flow mind map), **Draw** (Excalidraw whiteboard) and **Docs**.
+- **Today** — everything due today across every workspace, plus a per-user day planner notebook.
+- **Pages** — Notion-style block documents (BlockNote) at workspace or project level, nestable.
 - **Knowledge** — upload PDFs, DOCX, notes or code. They are chunked, embedded with **Voyage** and stored per-project in **Pinecone**.
 - **The brain** — a **Claude (`claude-opus-4-8`)** agent that answers questions from your documents, and creates/updates tasks by chatting. Plus a **daily standup** (overdue / due today / blocked / suggested).
-- **Smart linking** — every task surfaces related documents from its project's knowledge base.
+- **Sharing** — invite teammates by email with owner/admin/member/viewer roles, scoped to the whole workspace or specific projects.
 
 ## Stack
 
-Next.js 14 (App Router) · TypeScript · Tailwind · Firebase Auth (Google) + Firestore · Anthropic Claude · Voyage embeddings · Pinecone · @dnd-kit.
+Next.js 14 (App Router) · TypeScript · Tailwind · Firebase Auth (Google) + Firestore · Anthropic Claude · Voyage embeddings · Pinecone · @dnd-kit · reactflow · Excalidraw · BlockNote. Hosted on Netlify.
 
 Dark-first design system, one gold accent, per-workspace data isolation.
 
