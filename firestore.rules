@@ -32,6 +32,15 @@ service cloud.firestore {
       allow update, delete: if isMember(resource.data);
     }
 
+    // Live presence on a task. A user may only write their own presence doc
+    // (doc id is `${taskId}_${uid}`), and only within a workspace they belong to.
+    match /presence/{id} {
+      allow read: if isMember(resource.data);
+      allow create, update: if isMember(request.resource.data)
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
     // Per-user daily planner notes. memberIds is always the single owner uid.
     // A not-yet-created doc has a null `resource`, so allow signed-in reads of
     // the empty state (there is nothing to leak) and gate everything else on

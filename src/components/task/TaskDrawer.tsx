@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { FileText, Link2, Sparkles, Trash2, X } from "lucide-react";
-import type { RetrievedChunk, Task } from "@/lib/types";
+import type { Presence, RetrievedChunk, Task } from "@/lib/types";
 import { statusMeta } from "@/lib/constants";
+import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
+import { clearPresence, setPresence, watchPresence } from "@/lib/data/firestore";
 import { useTaskActions } from "@/lib/data/useTaskActions";
 import { postJSON } from "@/lib/api";
 import { relativeTime } from "@/lib/date";
 import { shortId } from "@/lib/utils";
+import { Avatar } from "@/components/ui/Avatar";
 import { StatusControl } from "@/components/ui/StatusControl";
 import { Button } from "@/components/ui/Button";
 import { AssigneePicker, DuePicker, PrioritySelect, RecurrencePicker, TagEditor } from "@/components/task/Pickers";
@@ -16,8 +19,10 @@ import { QuickAdd } from "@/components/task/TaskRow";
 import { TimeTracker } from "@/components/task/TimeTracker";
 
 export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () => void }) {
-  const { tasks } = useWorkspace();
+  const { tasks, currentProject, currentWorkspace } = useWorkspace();
+  const { user } = useAuth();
   const actions = useTaskActions();
+  const [viewers, setViewers] = useState<Presence[]>([]);
   const live = tasks.find((t) => t.id === task?.id) ?? task;
   const [title, setTitle] = useState(live?.title ?? "");
   const [notes, setNotes] = useState(live?.notes ?? "");
@@ -43,6 +48,26 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, task?.projectId]);
 
+  // Live presence: announce we're on this task, heartbeat while open, clean up on
+  // close. Others' avatars appear in the header.
+  const taskId = task?.id;
+  const memberIds = currentProject?.memberIds ?? currentWorkspace?.memberIds;
+  useEffect(() => {
+    if (!taskId || !user || !memberIds?.length) return;
+    const me = { uid: user.uid, name: user.displayName ?? "You", photoURL: user.photoURL };
+    const beat = () => void setPresence(taskId, me, memberIds).catch(() => {});
+    beat();
+    const interval = setInterval(beat, 20_000);
+    const unsub = watchPresence(user.uid, taskId, setViewers);
+    return () => {
+      clearInterval(interval);
+      unsub();
+      void clearPresence(taskId, user.uid);
+      setViewers([]);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId, user?.uid, memberIds?.join(",")]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
@@ -50,6 +75,7 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
   }, [onClose]);
 
   if (!live) return null;
+  const others = viewers.filter((v) => v.uid !== user?.uid);
   // Completed subtasks sink to the bottom, matching the tree view.
   const subtasks = tasks
     .filter((t) => t.parentId === live.id)
@@ -70,6 +96,20 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
             <span className={meta.color}>●</span>
             {meta.label}
             <span className="mono text-text-faint">· t·{shortId(live.id)}</span>
+          </div>
+          <div className="ml-auto mr-2 flex items-center">
+            {others.length > 0 && (
+              <div className="flex items-center -space-x-1.5" title={`${others.map((o) => o.name).join(", ")} also here`}>
+                {others.slice(0, 3).map((o) => (
+                  <Avatar key={o.uid} name={o.name} src={o.photoURL} size={20} ring />
+                ))}
+                {others.length > 3 && (
+                  <span className="grid h-5 w-5 place-items-center rounded-full bg-surface-3 text-[9px] text-text-muted ring-2 ring-bg">
+                    +{others.length - 3}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <button
             onClick={onClose}

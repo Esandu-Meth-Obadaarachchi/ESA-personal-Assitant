@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDocs,
   onSnapshot,
@@ -14,7 +15,7 @@ import {
 import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase/client";
 import { PROJECT_COLORS } from "@/lib/constants";
-import type { DayPlan, Page, Project, Task, Whiteboard, Workspace, WorkspaceMember } from "@/lib/types";
+import type { DayPlan, Page, Presence, Project, Task, Whiteboard, Workspace, WorkspaceMember } from "@/lib/types";
 import { slugifyNamespace } from "./tree";
 
 /**
@@ -589,4 +590,49 @@ export async function seedNewUser(user: User): Promise<string> {
 
   await batch.commit();
   return office.id;
+}
+
+/* ------------------------------ presence ------------------------------ */
+
+/** Presence older than this is considered stale (a closed or crashed tab). */
+export const PRESENCE_TTL_MS = 45_000;
+
+const presenceId = (taskId: string, uid: string) => `${taskId}_${uid}`;
+
+/** Announce (or heartbeat) that this user is viewing a task. */
+export async function setPresence(
+  taskId: string,
+  user: { uid: string; name: string; photoURL?: string | null },
+  memberIds: string[]
+) {
+  await setDoc(doc(requireDb(), "presence", presenceId(taskId, user.uid)), {
+    taskId,
+    uid: user.uid,
+    name: user.name,
+    photoURL: user.photoURL ?? null,
+    memberIds,
+    updatedAt: Date.now(),
+  });
+}
+
+export async function clearPresence(taskId: string, uid: string) {
+  await deleteDoc(doc(requireDb(), "presence", presenceId(taskId, uid))).catch(() => {});
+}
+
+/** Who else is on this task. Query is memberIds-constrained (rules are not
+ *  filters), then narrowed to the task and to fresh heartbeats. */
+export function watchPresence(uid: string, taskId: string, cb: (p: Presence[]) => void): Unsubscribe {
+  const q = query(collection(requireDb(), "presence"), where("memberIds", "array-contains", uid));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const now = Date.now();
+      cb(
+        snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as Omit<Presence, "id">) }))
+          .filter((p) => p.taskId === taskId && now - p.updatedAt < PRESENCE_TTL_MS)
+      );
+    },
+    (err) => console.error("watchPresence error", err)
+  );
 }
