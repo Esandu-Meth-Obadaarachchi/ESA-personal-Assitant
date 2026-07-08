@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CalendarCheck2, Loader2, RefreshCw } from "lucide-react";
-import { authedFetch, postJSON } from "@/lib/api";
+import { authedFetch, browserTimeZone, postJSON } from "@/lib/api";
 import { Dropdown, MenuItem } from "@/components/ui/Dropdown";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +29,7 @@ export function CalendarSync() {
   const runSync = useCallback(async () => {
     setBusy(true);
     try {
-      await postJSON("/api/calendar/sync", {});
+      await postJSON("/api/calendar/sync", { tz: browserTimeZone() });
     } finally {
       setBusy(false);
     }

@@ -95,11 +95,16 @@ export function useTaskActions() {
       setPriority: (id: string, priority: TaskPriority) => updateTask(id, { priority }),
       setDue: async (id: string, dueDate: string | null) => {
         // Clearing the date clears the time too.
-        await updateTask(id, dueDate ? { dueDate } : { dueDate: null, dueTime: null });
+        await updateTask(id, dueDate ? { dueDate } : { dueDate: null, dueTime: null, dueEndTime: null });
         syncTaskToCalendar(id);
       },
       setDueTime: async (id: string, dueTime: string | null) => {
-        await updateTask(id, { dueTime });
+        // Dropping the start time makes it all-day, so the end time goes too.
+        await updateTask(id, dueTime ? { dueTime } : { dueTime: null, dueEndTime: null });
+        syncTaskToCalendar(id);
+      },
+      setDueEndTime: async (id: string, dueEndTime: string | null) => {
+        await updateTask(id, { dueEndTime });
         syncTaskToCalendar(id);
       },
       setTags: (id: string, tags: string[]) => updateTask(id, { tags }),

@@ -10,11 +10,21 @@ export async function authedFetch(input: string, init: RequestInit = {}) {
 
 /** Fire-and-forget: push a task's state to Google Calendar. No-ops server-side
  *  if the user hasn't connected a calendar. Never blocks the UI. */
+/** The browser's IANA timezone. Sent with calendar writes so a timed task can
+ *  never silently degrade to an all-day event when the server can't resolve one. */
+export function browserTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function syncTaskToCalendar(taskId: string) {
   void authedFetch("/api/calendar/push", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ taskId }),
+    body: JSON.stringify({ taskId, tz: browserTimeZone() }),
   }).catch(() => {});
 }
 

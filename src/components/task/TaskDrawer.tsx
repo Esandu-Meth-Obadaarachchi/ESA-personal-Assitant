@@ -116,9 +116,11 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
               <DuePicker
                 value={live.dueDate}
                 time={live.dueTime}
+                endTime={live.dueEndTime}
                 status={live.status}
                 onChange={(d) => actions.setDue(live.id, d)}
                 onTimeChange={(t) => actions.setDueTime(live.id, t)}
+                onEndTimeChange={(t) => actions.setDueEndTime(live.id, t)}
               />
             </Prop>
             <Prop label="Repeat">

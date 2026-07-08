@@ -16,16 +16,30 @@ async function patchTask(id: string, patch: Record<string, unknown>) {
   await adminDb().collection("tasks").doc(id).update({ ...patch, updatedAt: Date.now() });
 }
 
-/** Cached primary-calendar timezone (needed for timed events); fetched once. */
-async function ensureTimeZone(uid: string, conn: CalendarConnection, accessToken: string): Promise<string | undefined> {
+/**
+ * Resolve a timezone for timed events. Order: the cached connection value, then
+ * the caller's (browser) timezone, then Google's primary-calendar default.
+ * Without one, taskToEvent falls back to an all-day event — which silently
+ * dropped the user's chosen time, so we try hard to always have one.
+ */
+async function ensureTimeZone(
+  uid: string,
+  conn: CalendarConnection,
+  accessToken: string,
+  clientTz?: string
+): Promise<string | undefined> {
   if (conn.timeZone) return conn.timeZone;
+  if (clientTz) {
+    await saveConnection(uid, { timeZone: clientTz });
+    return clientTz;
+  }
   const tz = await getCalendarTimeZone(accessToken);
   if (tz) await saveConnection(uid, { timeZone: tz });
   return tz ?? undefined;
 }
 
 /** Push a single task's state to Google Calendar (create / update / delete). */
-export async function pushTask(uid: string, taskId: string): Promise<{ status: string }> {
+export async function pushTask(uid: string, taskId: string, clientTz?: string): Promise<{ status: string }> {
   const conn = await getConnection(uid);
   if (!conn) return { status: "not_connected" };
 
@@ -34,7 +48,7 @@ export async function pushTask(uid: string, taskId: string): Promise<{ status: s
   if (!task.memberIds?.includes(uid)) return { status: "forbidden" };
 
   const accessToken = await getAccessToken(conn.refreshToken);
-  const tz = task.dueTime ? await ensureTimeZone(uid, conn, accessToken) : undefined;
+  const tz = task.dueTime ? await ensureTimeZone(uid, conn, accessToken, clientTz) : undefined;
 
   if (task.dueDate) {
     if (task.googleEventId) {
@@ -68,11 +82,11 @@ export async function deleteTaskEvent(uid: string, eventId: string) {
 }
 
 /** Push every dated task to Google (used right after connecting, and by Sync now). */
-export async function pushAllForUser(uid: string): Promise<{ status: string; pushed: number }> {
+export async function pushAllForUser(uid: string, clientTz?: string): Promise<{ status: string; pushed: number }> {
   const conn = await getConnection(uid);
   if (!conn) return { status: "not_connected", pushed: 0 };
   const accessToken = await getAccessToken(conn.refreshToken);
-  const tz = await ensureTimeZone(uid, conn, accessToken);
+  const tz = await ensureTimeZone(uid, conn, accessToken, clientTz);
 
   const snap = await adminDb().collection("tasks").where("memberIds", "array-contains", uid).get();
   const tasks = snap.docs
@@ -125,9 +139,11 @@ export async function pullForUser(uid: string): Promise<{ status: string; change
 
     const date = ev.start?.date ?? ev.start?.dateTime?.slice(0, 10);
     const time = ev.start?.dateTime ? ev.start.dateTime.slice(11, 16) : null;
+    const endTime = ev.end?.dateTime ? ev.end.dateTime.slice(11, 16) : null;
     const patch: Record<string, unknown> = {};
     if (date && date !== task.dueDate) patch.dueDate = date;
     if (time !== (task.dueTime ?? null)) patch.dueTime = time;
+    if (endTime !== (task.dueEndTime ?? null)) patch.dueEndTime = endTime;
     if (ev.summary && ev.summary !== task.title) patch.title = ev.summary;
     if (task.googleEventId !== ev.id) patch.googleEventId = ev.id;
     if (Object.keys(patch).length) {

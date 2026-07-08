@@ -16,13 +16,17 @@ export async function POST(req: Request) {
     return r instanceof Response ? r : NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const { taskId, deleteEventId } = (await req.json()) as { taskId?: string; deleteEventId?: string };
+    const { taskId, deleteEventId, tz } = (await req.json()) as {
+      taskId?: string;
+      deleteEventId?: string;
+      tz?: string;
+    };
     if (deleteEventId) {
       await deleteTaskEvent(user.uid, deleteEventId);
       return NextResponse.json({ status: "deleted" });
     }
     if (!taskId) return NextResponse.json({ error: "taskId required" }, { status: 400 });
-    const result = await pushTask(user.uid, taskId);
+    const result = await pushTask(user.uid, taskId, tz);
     return NextResponse.json(result);
   } catch (e) {
     console.error("calendar push error", e);

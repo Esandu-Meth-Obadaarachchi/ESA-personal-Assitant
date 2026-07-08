@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, Plus, Repeat, X } from "lucide-react";
+import { Plus, Repeat, X } from "lucide-react";
 import { PRIORITIES } from "@/lib/constants";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
-import { toISODate, todayISO } from "@/lib/date";
-import type { Recurrence, RecurrenceFreq, TaskPriority, TaskStatus } from "@/lib/types";
+import type { Recurrence, RecurrenceFreq, TaskPriority } from "@/lib/types";
 import { Avatar, AvatarEmpty } from "@/components/ui/Avatar";
 import { Dropdown, MenuItem } from "@/components/ui/Dropdown";
-import { DueDateChip } from "@/components/ui/DueDateChip";
 import { PriorityIndicator } from "@/components/ui/PriorityIndicator";
 import { TagChip } from "@/components/ui/TagChip";
 import { cn } from "@/lib/utils";
@@ -110,104 +108,8 @@ export function AssigneePicker({
   );
 }
 
-export function DuePicker({
-  value,
-  time,
-  status,
-  onChange,
-  onTimeChange,
-  placeholder = true,
-}: {
-  value?: string | null;
-  time?: string | null;
-  status?: TaskStatus;
-  onChange: (iso: string | null) => void;
-  onTimeChange?: (time: string | null) => void;
-  placeholder?: boolean;
-}) {
-  const quick = (days: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    return toISODate(d);
-  };
-  return (
-    <Dropdown
-      width={224}
-      align="right"
-      trigger={() =>
-        value ? (
-          <DueDateChip date={value} time={time} status={status} />
-        ) : placeholder ? (
-          <span className="grid h-6 w-6 place-items-center rounded-md text-text-faint hover:bg-surface-2 hover:text-text" title="Set due date">
-            <CalendarClock className="h-3.5 w-3.5" />
-          </span>
-        ) : (
-          <span />
-        )
-      }
-    >
-      {(close) => (
-        <div className="p-1">
-          <div className="grid grid-cols-2 gap-1">
-            {[
-              ["Today", 0],
-              ["Tomorrow", 1],
-              ["In 3 days", 3],
-              ["Next week", 7],
-            ].map(([label, d]) => (
-              <button
-                key={label as string}
-                onClick={() => onChange(quick(d as number))}
-                className="rounded-md px-2 py-1.5 text-left text-[13px] text-text hover:bg-surface-2"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="my-1.5 h-px bg-border" />
-          <input
-            type="date"
-            value={value ?? ""}
-            className="w-full rounded-md border border-border bg-surface-2 px-2 py-1.5 text-[13px] text-text outline-none focus:border-accent/60"
-            onChange={(e) => onChange(e.target.value || null)}
-          />
-          {/* Time of day — only meaningful once a date is set. */}
-          {onTimeChange && (
-            <div className="mt-1.5 flex items-center gap-1.5">
-              <input
-                type="time"
-                value={time ?? ""}
-                disabled={!value}
-                className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-[13px] text-text outline-none focus:border-accent/60 disabled:opacity-40"
-                onChange={(e) => onTimeChange(e.target.value || null)}
-              />
-              {time && (
-                <button
-                  onClick={() => onTimeChange(null)}
-                  className="rounded-md px-2 py-1.5 text-2xs text-text-faint hover:text-text"
-                  title="All-day"
-                >
-                  all-day
-                </button>
-              )}
-            </div>
-          )}
-          {value && (
-            <button
-              onClick={() => {
-                onChange(null);
-                close();
-              }}
-              className="mt-1.5 w-full rounded-md px-2 py-1.5 text-left text-[13px] text-danger hover:bg-danger/10"
-            >
-              Clear due date
-            </button>
-          )}
-        </div>
-      )}
-    </Dropdown>
-  );
-}
+// DuePicker (calendar grid + start/end time) lives in its own file.
+export { DuePicker } from "./DuePicker";
 
 const RECUR_LABEL: Record<RecurrenceFreq, string> = {
   daily: "Every day",

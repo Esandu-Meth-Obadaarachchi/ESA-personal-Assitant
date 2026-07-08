@@ -96,19 +96,28 @@ export function taskToEvent(task: Task, timeZone?: string) {
   };
 
   if (task.dueTime && timeZone) {
-    const [h, m] = task.dueTime.split(":").map(Number);
-    let endH = h + 1;
-    let endDate = task.dueDate as string;
-    if (endH >= 24) {
-      endH -= 24;
-      const d = new Date(`${task.dueDate}T00:00:00`);
+    const nextDay = (iso: string) => {
+      const d = new Date(`${iso}T00:00:00`);
       d.setDate(d.getDate() + 1);
-      endDate = d.toISOString().slice(0, 10);
-    }
+      return d.toISOString().slice(0, 10);
+    };
+    const toMins = (t: string) => {
+      const [h, m] = t.split(":").map(Number);
+      return h * 60 + m;
+    };
+    const fromMins = (mins: number) => `${pad(Math.floor(mins / 60) % 24)}:${pad(mins % 60)}`;
+
+    const startMins = toMins(task.dueTime);
+    // Explicit end time wins; if it's not after the start it's treated as
+    // spilling into the next day. Otherwise default to a one-hour block.
+    const rawEnd = task.dueEndTime ? toMins(task.dueEndTime) : startMins + 60;
+    const endMins = rawEnd > startMins ? rawEnd : rawEnd + 24 * 60;
+    const endDate = endMins >= 24 * 60 ? nextDay(task.dueDate as string) : (task.dueDate as string);
+
     return {
       ...base,
-      start: { dateTime: `${task.dueDate}T${pad(h)}:${pad(m)}:00`, timeZone },
-      end: { dateTime: `${endDate}T${pad(endH)}:${pad(m)}:00`, timeZone },
+      start: { dateTime: `${task.dueDate}T${fromMins(startMins)}:00`, timeZone },
+      end: { dateTime: `${endDate}T${fromMins(endMins)}:00`, timeZone },
     };
   }
 
@@ -158,6 +167,7 @@ export interface CalEvent {
   status?: string;
   summary?: string;
   start?: { date?: string; dateTime?: string };
+  end?: { date?: string; dateTime?: string };
   extendedProperties?: { private?: { sbTaskId?: string } };
 }
 
