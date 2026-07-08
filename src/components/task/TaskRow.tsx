@@ -177,6 +177,24 @@ export function QuickAdd({
   onCancel?: () => void;
 }) {
   const [value, setValue] = useState("");
+  // The live value is mirrored in a ref so `onBlur` never reads a stale render
+  // closure. Enter used to submit and clear state, then the blur that followed
+  // still saw the old value and submitted the same task a second time.
+  const valueRef = useRef("");
+
+  const update = (v: string) => {
+    valueRef.current = v;
+    setValue(v);
+  };
+
+  /** Submit once. Clearing the ref first makes a following blur a no-op. */
+  const submit = () => {
+    const title = valueRef.current.trim();
+    if (!title) return;
+    update("");
+    onAdd(title);
+  };
+
   return (
     <div className="flex items-center gap-1.5 rounded-md hover:bg-surface-2" style={{ paddingLeft: 8 + depth * 20 }}>
       <span className="grid h-5 w-5 place-items-center text-text-faint">
@@ -187,16 +205,19 @@ export function QuickAdd({
         autoFocus={autoFocus}
         value={value}
         placeholder={placeholder}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => update(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && value.trim()) {
-            onAdd(value.trim());
-            setValue("");
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
           }
-          if (e.key === "Escape") onCancel?.();
+          if (e.key === "Escape") {
+            update("");
+            onCancel?.();
+          }
         }}
         onBlur={() => {
-          if (value.trim()) onAdd(value.trim());
+          submit();
           onCancel?.();
         }}
         className="flex-1 bg-transparent py-1.5 text-[13.5px] text-text outline-none placeholder:text-text-faint"
