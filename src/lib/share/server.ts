@@ -159,6 +159,62 @@ export async function acceptInvites(caller: AuthedUser): Promise<number> {
   return claimed;
 }
 
+/** Pending invites addressed to the caller's email (their invite mailbox). */
+export async function listMyInvites(caller: AuthedUser): Promise<Invite[]> {
+  const email = caller.email?.toLowerCase();
+  if (!email) return [];
+  const snap = await adminDb().collection("invites").where("email", "==", email).get();
+  return snap.docs
+    .filter((d) => d.get("status") === "pending")
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<Invite, "id">) }))
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** Accept ONE invite, explicitly. Invites are never auto-claimed. */
+export async function acceptInvite(caller: AuthedUser, inviteId: string): Promise<void> {
+  const email = caller.email?.toLowerCase();
+  if (!email) throw new Response("No email on account", { status: 400 });
+
+  const ref = adminDb().collection("invites").doc(inviteId);
+  const doc = await ref.get();
+  if (!doc.exists) throw new Response("Invite not found", { status: 404 });
+
+  const invite = doc.data() as Omit<Invite, "id">;
+  // An invite may only be claimed by the person it was addressed to.
+  if (invite.email?.toLowerCase() !== email) throw new Response("Forbidden", { status: 403 });
+  if (invite.status !== "pending") return;
+
+  const { data: ws } = await loadWorkspaceUnchecked(invite.workspaceId);
+  if (!ws) {
+    await ref.update({ status: "declined" });
+    return;
+  }
+  if (!ws.members.some((m) => m.uid === caller.uid)) {
+    const member: WorkspaceMember = {
+      uid: caller.uid,
+      name: caller.name ?? "Teammate",
+      email,
+      photoURL: caller.picture ?? null,
+      role: invite.role,
+      scope: invite.scope,
+    };
+    await recomputeMembership(invite.workspaceId, [...ws.members, member]);
+  }
+  await ref.update({ status: "accepted" });
+}
+
+/** Decline ONE invite. The user never joins the workspace. */
+export async function declineInvite(caller: AuthedUser, inviteId: string): Promise<void> {
+  const email = caller.email?.toLowerCase();
+  if (!email) throw new Response("No email on account", { status: 400 });
+  const ref = adminDb().collection("invites").doc(inviteId);
+  const doc = await ref.get();
+  if (!doc.exists) return;
+  const invite = doc.data() as Omit<Invite, "id">;
+  if (invite.email?.toLowerCase() !== email) throw new Response("Forbidden", { status: 403 });
+  if (invite.status === "pending") await ref.update({ status: "declined" });
+}
+
 async function loadWorkspaceUnchecked(workspaceId: string): Promise<{ data: Workspace | null }> {
   const snap = await adminDb().collection("workspaces").doc(workspaceId).get();
   if (!snap.exists) return { data: null };

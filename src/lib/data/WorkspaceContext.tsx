@@ -9,7 +9,6 @@ import {
   useState,
 } from "react";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { postJSON } from "@/lib/api";
 import type { Page, Project, Task, Workspace } from "@/lib/types";
 import {
   ensureInbox,
@@ -147,7 +146,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user || acceptedRef.current) return;
     acceptedRef.current = true;
-    postJSON("/api/members", { action: "accept" }).catch(() => {});
+    // Invites are NOT auto-claimed. The user accepts or declines each one
+    // explicitly from the invite mailbox in the sidebar.
   }, [user]);
 
   // Watch every task the user can see; the calendar + overview use the

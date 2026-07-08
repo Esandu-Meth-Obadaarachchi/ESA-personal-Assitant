@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/firebase/admin";
 import {
+  acceptInvite,
   acceptInvites,
   createInvite,
+  declineInvite,
+  listMyInvites,
   listShare,
   removeMember,
   revokeInvite,
@@ -26,7 +29,12 @@ async function auth(req: Request) {
 export async function GET(req: Request) {
   try {
     const user = await auth(req);
-    const workspaceId = new URL(req.url).searchParams.get("workspaceId");
+    const url = new URL(req.url);
+    // ?mine=1 -> the caller's own pending invites (their invite mailbox).
+    if (url.searchParams.get("mine")) {
+      return NextResponse.json({ invites: await listMyInvites(user) });
+    }
+    const workspaceId = url.searchParams.get("workspaceId");
     if (!workspaceId) return NextResponse.json({ error: "workspaceId required" }, { status: 400 });
     return NextResponse.json(await listShare(user, workspaceId));
   } catch (err) {
@@ -39,7 +47,14 @@ export async function POST(req: Request) {
   try {
     const user = await auth(req);
     const body = (await req.json()) as {
-      action: "invite" | "accept" | "update" | "removeMember" | "revokeInvite";
+      action:
+        | "invite"
+        | "accept"
+        | "acceptOne"
+        | "declineOne"
+        | "update"
+        | "removeMember"
+        | "revokeInvite";
       workspaceId?: string;
       email?: string;
       role?: MemberRole;
@@ -51,6 +66,12 @@ export async function POST(req: Request) {
     switch (body.action) {
       case "accept":
         return NextResponse.json({ claimed: await acceptInvites(user) });
+      case "acceptOne":
+        await acceptInvite(user, body.inviteId!);
+        return NextResponse.json({ ok: true });
+      case "declineOne":
+        await declineInvite(user, body.inviteId!);
+        return NextResponse.json({ ok: true });
       case "invite":
         await createInvite(user, {
           workspaceId: body.workspaceId!,
