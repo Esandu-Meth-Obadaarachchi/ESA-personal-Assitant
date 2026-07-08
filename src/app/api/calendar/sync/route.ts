@@ -15,7 +15,8 @@ export async function POST(req: Request) {
     return r instanceof Response ? r : NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const pushed = await pushAllForUser(user.uid);
+    const { tz } = (await req.json().catch(() => ({}))) as { tz?: string };
+    const pushed = await pushAllForUser(user.uid, tz);
     const pulled = await pullForUser(user.uid);
     return NextResponse.json({ pushed: pushed.pushed, pulled: pulled.changed, status: pushed.status });
   } catch (e) {

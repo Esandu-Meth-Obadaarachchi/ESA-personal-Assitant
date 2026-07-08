@@ -131,9 +131,11 @@ function Row({
           <DuePicker
             value={task.dueDate}
             time={task.dueTime}
+            endTime={task.dueEndTime}
             status={task.status}
             onChange={(d) => actions.setDue(task.id, d)}
             onTimeChange={(tm) => actions.setDueTime(task.id, tm)}
+            onEndTimeChange={(tm) => actions.setDueEndTime(task.id, tm)}
           />
           <PrioritySelect value={task.priority} onChange={(p) => actions.setPriority(task.id, p)} />
           <AssigneePicker

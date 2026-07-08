@@ -274,6 +274,7 @@ export interface NewTaskInput {
   priority?: Task["priority"];
   dueDate?: string | null;
   dueTime?: string | null;
+  dueEndTime?: string | null;
   order?: number;
   assignee?: { id: string; name: string; avatar?: string | null } | null;
 }
@@ -293,6 +294,7 @@ export async function createTask(input: NewTaskInput): Promise<string> {
     assigneeAvatar: input.assignee?.avatar ?? null,
     dueDate: input.dueDate ?? null,
     dueTime: input.dueTime ?? null,
+    dueEndTime: input.dueEndTime ?? null,
     startDate: null,
     tags: [],
     dependencies: [],

@@ -111,8 +111,10 @@ export interface Task {
   assigneeAvatar?: string | null;
   /** ISO date string (yyyy-mm-dd) or null. */
   dueDate?: string | null;
-  /** Optional time of day (HH:MM, 24h). null => all-day. */
+  /** Optional start time of day (HH:MM, 24h). null => all-day. */
   dueTime?: string | null;
+  /** Optional end time (HH:MM, 24h). Only meaningful with dueTime; defaults to +1h. */
+  dueEndTime?: string | null;
   startDate?: string | null;
   tags: string[];
   /** Task ids this task depends on. */
