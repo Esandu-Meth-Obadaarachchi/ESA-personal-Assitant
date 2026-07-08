@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/Button";
 import { Dropdown, MenuItem } from "@/components/ui/Dropdown";
 import { Field, Modal, inputClass } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
+import { InviteMailbox } from "./InviteMailbox";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export function Sidebar({
@@ -131,6 +132,7 @@ export function Sidebar({
         <div className="min-w-0 flex-1">
           <WorkspaceSwitcher />
         </div>
+        <InviteMailbox />
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}

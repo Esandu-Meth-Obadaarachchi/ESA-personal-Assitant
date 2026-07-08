@@ -40,7 +40,7 @@ export interface Invite {
   invitedByUid: string;
   invitedByName: string;
   createdAt: number;
-  status: "pending" | "accepted";
+  status: "pending" | "accepted" | "declined";
 }
 
 export interface Workspace {
