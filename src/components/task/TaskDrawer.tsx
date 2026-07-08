@@ -50,7 +50,14 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
   }, [onClose]);
 
   if (!live) return null;
-  const subtasks = tasks.filter((t) => t.parentId === live.id).sort((a, b) => a.order - b.order);
+  // Completed subtasks sink to the bottom, matching the tree view.
+  const subtasks = tasks
+    .filter((t) => t.parentId === live.id)
+    .sort((a, b) => {
+      const ad = a.status === "done" ? 1 : 0;
+      const bd = b.status === "done" ? 1 : 0;
+      return ad - bd || a.order - b.order;
+    });
   const parent = live.parentId ? tasks.find((t) => t.id === live.parentId) : null;
   const meta = statusMeta(live.status);
 

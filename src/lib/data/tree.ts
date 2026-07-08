@@ -20,8 +20,13 @@ export function buildTree(tasks: Task[]): TaskNode[] {
     else roots.push(node);
   });
 
+  // Completed tasks sink to the bottom of their sibling group, then normal order.
   const sortRec = (nodes: TaskNode[], depth: number) => {
-    nodes.sort((a, b) => a.order - b.order);
+    nodes.sort((a, b) => {
+      const ad = a.status === "done" ? 1 : 0;
+      const bd = b.status === "done" ? 1 : 0;
+      return ad - bd || a.order - b.order;
+    });
     nodes.forEach((n) => {
       n.depth = depth;
       sortRec(n.children, depth + 1);
