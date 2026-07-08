@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -48,61 +48,88 @@ export function KanbanBoard({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
 
   const [cols, setCols] = useState<Columns>(derived);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const dragging = useRef(false);
 
-  // Sync from Firestore whenever we're not mid-drag.
+  // Re-sync from Firestore only when the underlying data actually changes, and
+  // never mid-drag. Keying this on `activeId` used to clobber the optimistic
+  // drop with stale `derived` before Firestore round-tripped, so cards snapped
+  // back and drops looked rejected.
   useEffect(() => {
-    if (!activeId) setCols(derived);
-  }, [derived, activeId]);
+    if (!dragging.current) setCols(derived);
+  }, [derived]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const findCol = (id: string): TaskStatus | null => {
-    if (id in cols) return id as TaskStatus;
-    return (Object.keys(cols) as TaskStatus[]).find((s) => cols[s].includes(id)) ?? null;
+  /** Column droppables are prefixed so they can never collide with a task id. */
+  const colOf = (id: string, source: Columns = cols): TaskStatus | null => {
+    if (id.startsWith("col:")) return id.slice(4) as TaskStatus;
+    return STATUS_ORDER.find((s) => source[s].includes(id)) ?? null;
   };
 
-  const onDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
+  const onDragStart = (e: DragStartEvent) => {
+    dragging.current = true;
+    setActiveId(String(e.active.id));
+  };
 
   const onDragOver = (e: DragOverEvent) => {
-    const activeCol = findCol(String(e.active.id));
-    const overCol = findCol(String(e.over?.id ?? ""));
-    if (!activeCol || !overCol || activeCol === overCol) return;
+    const overId = e.over?.id ? String(e.over.id) : null;
+    if (!overId) return;
+    const activeIdStr = String(e.active.id);
     setCols((prev) => {
-      const next = { ...prev, [activeCol]: [...prev[activeCol]], [overCol]: [...prev[overCol]] };
-      next[activeCol] = next[activeCol].filter((id) => id !== e.active.id);
-      const overIdx = next[overCol].indexOf(String(e.over?.id));
-      const insertAt = overIdx >= 0 ? overIdx : next[overCol].length;
-      next[overCol].splice(insertAt, 0, String(e.active.id));
+      const from = colOf(activeIdStr, prev);
+      const to = colOf(overId, prev);
+      if (!from || !to || from === to) return prev;
+      const next = { ...prev, [from]: [...prev[from]], [to]: [...prev[to]] };
+      next[from] = next[from].filter((id) => id !== activeIdStr);
+      const overIdx = next[to].indexOf(overId);
+      next[to].splice(overIdx >= 0 ? overIdx : next[to].length, 0, activeIdStr);
       return next;
     });
   };
 
   const onDragEnd = (e: DragEndEvent) => {
-    const activeCol = findCol(String(e.active.id));
-    const overCol = findCol(String(e.over?.id ?? ""));
+    const activeIdStr = String(e.active.id);
+    const overId = e.over?.id ? String(e.over.id) : null;
+    dragging.current = false;
     setActiveId(null);
-    if (!activeCol || !overCol) return;
+    if (!overId) return;
 
-    // Reorder within destination column.
-    setCols((prev) => {
-      const next = { ...prev, [overCol]: [...prev[overCol]] };
-      const from = next[overCol].indexOf(String(e.active.id));
-      const to = next[overCol].indexOf(String(e.over?.id));
-      if (from >= 0 && to >= 0 && from !== to) {
-        next[overCol].splice(to, 0, next[overCol].splice(from, 1)[0]);
+    // Compute the final arrangement synchronously, then persist outside of any
+    // state updater (updaters must stay pure).
+    const to = colOf(overId);
+    const from = colOf(activeIdStr);
+    if (!from || !to) return;
+
+    let final: Columns = cols;
+    if (from === to) {
+      const oldIdx = cols[to].indexOf(activeIdStr);
+      const newIdx = overId.startsWith("col:") ? cols[to].length - 1 : cols[to].indexOf(overId);
+      if (oldIdx >= 0 && newIdx >= 0 && oldIdx !== newIdx) {
+        const arr = [...cols[to]];
+        arr.splice(newIdx, 0, arr.splice(oldIdx, 1)[0]);
+        final = { ...cols, [to]: arr };
       }
-      // Persist any card whose status/order changed.
-      const moves: { id: string; order: number; status: TaskStatus }[] = [];
-      (Object.keys(next) as TaskStatus[]).forEach((status) => {
-        next[status].forEach((id, i) => {
-          const t = byId.get(id);
-          const order = i * 1000;
-          if (t && (t.status !== status || t.order !== order)) moves.push({ id, order, status });
-        });
+    }
+    setCols(final);
+
+    const moves: { id: string; order: number; status: TaskStatus }[] = [];
+    STATUS_ORDER.forEach((status) => {
+      final[status].forEach((id, i) => {
+        const t = byId.get(id);
+        const order = i * 1000;
+        if (t && (t.status !== status || t.order !== order)) moves.push({ id, order, status });
       });
-      if (moves.length) void commitTaskMoves(moves);
-      return next;
     });
+    if (moves.length) {
+      // On failure, fall back to the authoritative Firestore state.
+      void commitTaskMoves(moves).catch(() => setCols(derived));
+    }
+  };
+
+  const onDragCancel = () => {
+    dragging.current = false;
+    setActiveId(null);
+    setCols(derived);
   };
 
   const active = activeId ? byId.get(activeId) : null;
@@ -114,6 +141,7 @@ export function KanbanBoard({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
     >
       <div className="flex h-full gap-3 overflow-x-auto px-4 py-4">
         {STATUS_ORDER.map((status) => (
@@ -152,11 +180,13 @@ function Column({
   onAdd: (title: string) => void;
 }) {
   const meta = statusMeta(status);
-  const { setNodeRef, isOver } = useDroppable({ id: status });
+  // Prefixed id: never collides with a task id. The ref wraps the whole column
+  // so empty space anywhere in it is a valid drop target.
+  const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` });
   const [adding, setAdding] = useState(false);
 
   return (
-    <div className="flex w-[288px] shrink-0 flex-col">
+    <div ref={setNodeRef} className="flex w-[288px] shrink-0 flex-col">
       <div className="mb-2 flex items-center gap-2 px-1">
         <span className={cn("h-2 w-2 rounded-full", meta.dot)} />
         <span className="text-[13px] font-medium text-text">{meta.label}</span>
@@ -169,7 +199,6 @@ function Column({
         </button>
       </div>
       <div
-        ref={setNodeRef}
         className={cn(
           "min-h-[120px] flex-1 space-y-2 rounded-lg border border-transparent p-1.5 transition-colors",
           isOver && "border-accent/25 bg-accent/[0.04]"
