@@ -193,6 +193,21 @@ export interface Page {
   memberIds: string[];
 }
 
+/**
+ * Live presence on a task: one doc per (task, user), refreshed by a heartbeat and
+ * deleted on close. Anything older than PRESENCE_TTL_MS is treated as gone, so a
+ * crashed tab cannot leave a ghost behind.
+ */
+export interface Presence {
+  id: string;
+  taskId: string;
+  uid: string;
+  name: string;
+  photoURL?: string | null;
+  updatedAt: number;
+  memberIds: string[];
+}
+
 /** Retrieval + chat wire types (RAG). */
 export interface RetrievedChunk {
   id: string;
