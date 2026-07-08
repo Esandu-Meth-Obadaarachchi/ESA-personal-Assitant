@@ -44,3 +44,37 @@ export function exportTimeCSV(projectName: string, tasks: Task[]) {
     "text/csv;charset=utf-8"
   );
 }
+
+/** Rows for a day export: a task plus the names we can resolve for it. */
+export interface DayExportRow {
+  task: Task;
+  bucket: "Due today" | "Overdue";
+  workspace?: string;
+}
+
+/** Export everything on your plate for a given day (due today + overdue). */
+export function exportTodayCSV(dateISO: string, rows: DayExportRow[]) {
+  const header = ["Bucket", "Workspace", "Task", "Status", "Priority", "Due date", "Start", "End", "Tags"];
+  const lines = [header.map(csvCell).join(",")];
+
+  for (const { task, bucket, workspace } of rows) {
+    lines.push(
+      [
+        bucket,
+        workspace ?? "",
+        task.title,
+        task.status,
+        task.priority,
+        task.dueDate ?? "",
+        task.dueTime ?? "",
+        task.dueEndTime ?? "",
+        (task.tags ?? []).join(" "),
+      ]
+        .map(csvCell)
+        .join(",")
+    );
+  }
+  if (rows.length === 0) lines.push(["", "", "Nothing scheduled", "", "", "", "", "", ""].map(csvCell).join(","));
+
+  download(`tasks-${dateISO}.csv`, lines.join("\n"), "text/csv;charset=utf-8");
+}
