@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarCheck2, ChevronLeft, ChevronRight, NotebookPen } from "lucide-react";
+import { CalendarCheck2, ChevronLeft, ChevronRight, Download, NotebookPen } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { saveDayPlan, watchDayPlan } from "@/lib/data/firestore";
@@ -13,6 +13,7 @@ import { DueDateChip } from "@/components/ui/DueDateChip";
 import { PriorityDot } from "@/components/ui/PriorityIndicator";
 import { Logo } from "@/components/ui/Logo";
 import { PRIORITY_ORDER } from "@/lib/constants";
+import { exportTodayCSV, type DayExportRow } from "@/lib/export";
 import { cn } from "@/lib/utils";
 
 export default function TodayPage() {
@@ -37,6 +38,18 @@ export default function TodayPage() {
     [allTasks, today]
   );
   const doneToday = allTasks.filter((t) => t.status === "done" && t.dueDate === today).length;
+
+  // Everything on the plate for today: due today (any status) + still-open overdue.
+  const exportToday = () => {
+    const wsName = (id: string) => workspaces.find((w) => w.id === id)?.name;
+    const rows: DayExportRow[] = [
+      ...allTasks
+        .filter((t) => t.dueDate === today)
+        .map((t) => ({ task: t, bucket: "Due today" as const, workspace: wsName(t.workspaceId) })),
+      ...overdue.map((t) => ({ task: t, bucket: "Overdue" as const, workspace: wsName(t.workspaceId) })),
+    ];
+    exportTodayCSV(today, rows);
+  };
 
   const wsById = useMemo(() => {
     const m = new Map<string, Workspace>();
@@ -68,9 +81,18 @@ export default function TodayPage() {
           <div className="text-xs text-text-muted">{format(new Date(), "EEEE, d MMMM")}</div>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          <Stat label="due today" value={dueToday.length} />
-          {overdue.length > 0 && <Stat label="overdue" value={overdue.length} tone="danger" />}
-          {doneToday > 0 && <Stat label="done" value={doneToday} />}
+          <div className="hidden items-center gap-1.5 sm:flex">
+            <Stat label="due today" value={dueToday.length} />
+            {overdue.length > 0 && <Stat label="overdue" value={overdue.length} tone="danger" />}
+            {doneToday > 0 && <Stat label="done" value={doneToday} />}
+          </div>
+          <button
+            onClick={exportToday}
+            title="Export today's tasks as CSV"
+            className="ml-1 inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2.5 text-2xs font-medium text-text-muted transition-colors hover:border-border-strong hover:text-text"
+          >
+            <Download className="h-3.5 w-3.5" /> Export
+          </button>
         </div>
       </header>
 
