@@ -5,9 +5,12 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  pointerWithin,
+  rectIntersection,
   closestCorners,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -30,6 +33,21 @@ import { QuickAdd } from "@/components/task/TaskRow";
 import { cn } from "@/lib/utils";
 
 type Columns = Record<TaskStatus, string[]>;
+
+/**
+ * Pointer-first collision. closestCorners can't reliably target an EMPTY column
+ * (there are no nearby cards, so a card in an adjacent column always wins),
+ * which is why drops into empty To Do / In Progress / Blocked / Done were lost.
+ * pointerWithin detects the column container directly under the cursor; we fall
+ * back to rect intersection, then closestCorners, for the has-cards case.
+ */
+const boardCollision: CollisionDetection = (args) => {
+  const pointer = pointerWithin(args);
+  if (pointer.length) return pointer;
+  const rect = rectIntersection(args);
+  if (rect.length) return rect;
+  return closestCorners(args);
+};
 
 export function KanbanBoard({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
   const { tasks } = useWorkspace();
@@ -137,7 +155,7 @@ export function KanbanBoard({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={boardCollision}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
