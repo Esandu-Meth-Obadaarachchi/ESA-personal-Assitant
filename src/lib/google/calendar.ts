@@ -114,19 +114,24 @@ export function taskToEvent(task: Task, timeZone?: string) {
     const endMins = rawEnd > startMins ? rawEnd : rawEnd + 24 * 60;
     const endDate = endMins >= 24 * 60 ? nextDay(task.dueDate as string) : (task.dueDate as string);
 
+    // `date: null` is required: when an event was first created all-day and is
+    // now getting a time, a PATCH that only sets dateTime leaves the old
+    // start.date/end.date in place, so Google keeps it all-day (or 400s on the
+    // date+dateTime clash). Explicitly clearing date converts it to timed.
     return {
       ...base,
-      start: { dateTime: `${task.dueDate}T${fromMins(startMins)}:00`, timeZone },
-      end: { dateTime: `${endDate}T${fromMins(endMins)}:00`, timeZone },
+      start: { dateTime: `${task.dueDate}T${fromMins(startMins)}:00`, timeZone, date: null },
+      end: { dateTime: `${endDate}T${fromMins(endMins)}:00`, timeZone, date: null },
     };
   }
 
   const end = new Date(`${task.dueDate}T00:00:00`);
   end.setDate(end.getDate() + 1);
+  // Symmetrically clear dateTime/timeZone so a timed -> all-day change sticks.
   return {
     ...base,
-    start: { date: task.dueDate },
-    end: { date: end.toISOString().slice(0, 10) },
+    start: { date: task.dueDate, dateTime: null, timeZone: null },
+    end: { date: end.toISOString().slice(0, 10), dateTime: null, timeZone: null },
   };
 }
 
