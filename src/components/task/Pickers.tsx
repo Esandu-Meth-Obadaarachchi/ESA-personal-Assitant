@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Repeat, X } from "lucide-react";
 import { PRIORITIES } from "@/lib/constants";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
+import { addProjectTag, removeProjectTag } from "@/lib/data/firestore";
 import type { Assignee, Recurrence, RecurrenceFreq, TaskPriority } from "@/lib/types";
 import { Avatar, AvatarEmpty } from "@/components/ui/Avatar";
 import { Dropdown, MenuItem } from "@/components/ui/Dropdown";
@@ -202,6 +203,12 @@ export function RecurrencePicker({
   );
 }
 
+/**
+ * Task tag editor backed by the current project's tag palette. You pick from
+ * the labels defined on the project (custom, per-project — separate from the
+ * built-in statuses), and creating a new one adds it to the project palette so
+ * every task in the project can reuse it.
+ */
 export function TagEditor({
   tags,
   onChange,
@@ -209,39 +216,96 @@ export function TagEditor({
   tags: string[];
   onChange: (t: string[]) => void;
 }) {
+  const { currentProject } = useWorkspace();
   const [input, setInput] = useState("");
-  const add = () => {
-    const v = input.trim().toLowerCase();
-    if (v && !tags.includes(v)) onChange([...tags, v]);
-    setInput("");
+  const palette = currentProject?.tags ?? [];
+  const projectId = currentProject?.id;
+
+  const toggle = (t: string) => {
+    onChange(tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t]);
   };
+
+  const create = () => {
+    const v = input.trim().toLowerCase();
+    setInput("");
+    if (!v) return;
+    if (projectId && !palette.includes(v)) void addProjectTag(projectId, v);
+    if (!tags.includes(v)) onChange([...tags, v]);
+  };
+
+  const query = input.trim().toLowerCase();
+  const matches = palette.filter((t) => t.includes(query));
+  const canCreate = query.length > 0 && !palette.includes(query);
+
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {tags.map((t) => (
         <span key={t} className="group inline-flex items-center gap-0.5">
           <TagChip tag={t} />
-          <button
-            onClick={() => onChange(tags.filter((x) => x !== t))}
-            className="text-text-faint hover:text-danger"
-          >
+          <button onClick={() => toggle(t)} className="text-text-faint hover:text-danger" title="Remove tag">
             <X className="h-3 w-3" />
           </button>
         </span>
       ))}
-      <span className="inline-flex items-center rounded border border-dashed border-border px-1">
-        <Plus className="h-3 w-3 text-text-faint" />
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") add();
-            if (e.key === "Backspace" && !input && tags.length) onChange(tags.slice(0, -1));
-          }}
-          onBlur={add}
-          placeholder="tag"
-          className={cn("w-14 bg-transparent px-1 py-0.5 text-2xs text-text outline-none placeholder:text-text-faint")}
-        />
-      </span>
+      <Dropdown
+        width={220}
+        trigger={() => (
+          <span className="inline-flex items-center gap-0.5 rounded border border-dashed border-border px-1.5 py-0.5 text-2xs text-text-faint hover:border-border-strong hover:text-text">
+            <Plus className="h-3 w-3" /> Tag
+          </span>
+        )}
+      >
+        {() => (
+          <div>
+            <div className="px-1.5 pb-1.5">
+              <input
+                autoFocus
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") create();
+                }}
+                placeholder="Find or create a tag"
+                className="w-full rounded border border-border bg-surface-2 px-2 py-1 text-2xs text-text outline-none placeholder:text-text-faint focus:border-border-strong"
+              />
+            </div>
+            <div className="max-h-56 overflow-y-auto">
+              {matches.map((t) => (
+                <div key={t} className="group/row flex items-center">
+                  <div className="min-w-0 flex-1">
+                    <MenuItem active={tags.includes(t)} onClick={() => toggle(t)}>
+                      <TagChip tag={t} />
+                    </MenuItem>
+                  </div>
+                  {projectId && (
+                    <button
+                      onClick={() => {
+                        void removeProjectTag(projectId, t);
+                        if (tags.includes(t)) onChange(tags.filter((x) => x !== t));
+                      }}
+                      className="mr-1 hidden shrink-0 rounded p-1 text-text-faint hover:text-danger group-hover/row:block"
+                      title="Delete tag from project"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {matches.length === 0 && !canCreate && (
+                <div className="px-2 py-1.5 text-2xs text-text-faint">No tags yet</div>
+              )}
+            </div>
+            {canCreate && (
+              <>
+                <div className="my-1 h-px bg-border" />
+                <MenuItem icon={<Plus className="h-4 w-4" />} onClick={create}>
+                  Create “{query}”
+                </MenuItem>
+              </>
+            )}
+          </div>
+        )}
+      </Dropdown>
     </div>
   );
 }

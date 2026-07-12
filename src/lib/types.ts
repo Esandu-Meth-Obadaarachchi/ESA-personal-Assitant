@@ -68,6 +68,8 @@ export interface Project {
   createdAt: number;
   /** Denormalised access list — full-access members + members scoped to this project. */
   memberIds?: string[];
+  /** The project's custom tag palette — the labels its tasks can be tagged with. */
+  tags?: string[];
 }
 
 export interface LinkedDoc {

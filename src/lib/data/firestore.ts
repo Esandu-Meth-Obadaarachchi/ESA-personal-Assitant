@@ -1,5 +1,7 @@
 import {
   addDoc,
+  arrayRemove,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -153,6 +155,16 @@ export function fullAccessUids(workspace: Workspace): string[] {
 
 export async function updateProject(id: string, patch: Partial<Project>) {
   await updateDoc(doc(requireDb(), "projects", id), patch);
+}
+
+/** Add a label to a project's tag palette (the set every task can pick from). */
+export async function addProjectTag(id: string, tag: string) {
+  await updateDoc(doc(requireDb(), "projects", id), { tags: arrayUnion(tag) });
+}
+
+/** Remove a label from a project's palette. Tasks that already use it keep it. */
+export async function removeProjectTag(id: string, tag: string) {
+  await updateDoc(doc(requireDb(), "projects", id), { tags: arrayRemove(tag) });
 }
 
 /**
