@@ -96,6 +96,13 @@ export interface TimeEntry {
   note?: string;
 }
 
+/** One person assigned to a task. Tasks can have several. */
+export interface Assignee {
+  id: string;
+  name: string;
+  avatar?: string | null;
+}
+
 export interface Task {
   id: string;
   workspaceId: string;
@@ -106,6 +113,9 @@ export interface Task {
   notes?: string;
   status: TaskStatus;
   priority: TaskPriority;
+  /** All assignees. The legacy single-assignee fields below mirror the first
+   *  entry so older reads keep working; use taskAssignees(task) to read this. */
+  assignees?: Assignee[];
   assigneeId?: string | null;
   assigneeName?: string | null;
   assigneeAvatar?: string | null;

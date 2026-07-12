@@ -189,6 +189,7 @@ export async function executeTool(
         notes: "",
         status: (input.status as TaskStatus) ?? "todo",
         priority: (input.priority as TaskPriority) ?? "med",
+        assignees: [{ id: ctx.uid, name: ctx.userName, avatar: null }],
         assigneeId: ctx.uid,
         assigneeName: ctx.userName,
         assigneeAvatar: null,
