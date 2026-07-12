@@ -5,10 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarCheck2, ChevronLeft, ChevronRight, Download, NotebookPen } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
-import { saveDayPlan, watchDayPlan } from "@/lib/data/firestore";
+import { saveDayPlan, watchAllProjects, watchDayPlan } from "@/lib/data/firestore";
 import { addDays, format } from "date-fns";
 import { dueLabel, greeting, toISODate, todayISO } from "@/lib/date";
-import type { Task, Workspace } from "@/lib/types";
+import type { Project, Task, Workspace } from "@/lib/types";
 import { DueDateChip } from "@/components/ui/DueDateChip";
 import { PriorityDot } from "@/components/ui/PriorityIndicator";
 import { Logo } from "@/components/ui/Logo";
@@ -21,6 +21,18 @@ export default function TodayPage() {
   const { allTasks, workspaces, openWorkspaceProject } = useWorkspace();
   const router = useRouter();
   const today = todayISO();
+
+  // Project names across every workspace, so each task can show its project.
+  const [projects, setProjects] = useState<Project[]>([]);
+  useEffect(() => {
+    if (!user) return;
+    return watchAllProjects(user.uid, setProjects);
+  }, [user]);
+  const projName = useMemo(() => {
+    const m = new Map<string, string>();
+    projects.forEach((p) => m.set(p.id, p.isInbox ? "Inbox" : p.name));
+    return m;
+  }, [projects]);
 
   // Every open task due today, from every workspace and project.
   const dueToday = useMemo(
@@ -45,8 +57,18 @@ export default function TodayPage() {
     const rows: DayExportRow[] = [
       ...allTasks
         .filter((t) => t.dueDate === today)
-        .map((t) => ({ task: t, bucket: "Due today" as const, workspace: wsName(t.workspaceId) })),
-      ...overdue.map((t) => ({ task: t, bucket: "Overdue" as const, workspace: wsName(t.workspaceId) })),
+        .map((t) => ({
+          task: t,
+          bucket: "Due today" as const,
+          workspace: wsName(t.workspaceId),
+          project: projName.get(t.projectId),
+        })),
+      ...overdue.map((t) => ({
+        task: t,
+        bucket: "Overdue" as const,
+        workspace: wsName(t.workspaceId),
+        project: projName.get(t.projectId),
+      })),
     ];
     exportTodayCSV(today, rows);
   };
@@ -103,11 +125,19 @@ export default function TodayPage() {
             title="Due today"
             tasks={dueToday}
             wsById={wsById}
+            projName={projName}
             onOpen={openTask}
             empty="Nothing is due today. Enjoy the quiet, or pull something forward."
           />
           {overdue.length > 0 && (
-            <TaskGroup title="Overdue" tasks={overdue} wsById={wsById} onOpen={openTask} tone="danger" />
+            <TaskGroup
+              title="Overdue"
+              tasks={overdue}
+              wsById={wsById}
+              projName={projName}
+              onOpen={openTask}
+              tone="danger"
+            />
           )}
         </section>
 
@@ -130,6 +160,7 @@ function TaskGroup({
   title,
   tasks,
   wsById,
+  projName,
   onOpen,
   empty,
   tone,
@@ -137,6 +168,7 @@ function TaskGroup({
   title: string;
   tasks: Task[];
   wsById: Map<string, Workspace>;
+  projName: Map<string, string>;
   onOpen: (t: Task) => void;
   empty?: string;
   tone?: "danger";
@@ -169,6 +201,12 @@ function TaskGroup({
               <span className="hidden shrink-0 items-center gap-1 text-2xs text-text-faint sm:flex">
                 {wsById.get(t.workspaceId)?.emoji}
                 {wsById.get(t.workspaceId)?.name}
+                {projName.get(t.projectId) && (
+                  <>
+                    <span className="text-text-faint/50">/</span>
+                    <span className="text-text-muted">{projName.get(t.projectId)}</span>
+                  </>
+                )}
               </span>
               <DueDateChip date={t.dueDate} time={t.dueTime} status={t.status} icon={false} />
             </button>

@@ -50,18 +50,20 @@ export interface DayExportRow {
   task: Task;
   bucket: "Due today" | "Overdue";
   workspace?: string;
+  project?: string;
 }
 
 /** Export everything on your plate for a given day (due today + overdue). */
 export function exportTodayCSV(dateISO: string, rows: DayExportRow[]) {
-  const header = ["Bucket", "Workspace", "Task", "Status", "Priority", "Due date", "Start", "End", "Tags"];
+  const header = ["Bucket", "Workspace", "Project", "Task", "Status", "Priority", "Due date", "Start", "End", "Tags"];
   const lines = [header.map(csvCell).join(",")];
 
-  for (const { task, bucket, workspace } of rows) {
+  for (const { task, bucket, workspace, project } of rows) {
     lines.push(
       [
         bucket,
         workspace ?? "",
+        project ?? "",
         task.title,
         task.status,
         task.priority,
@@ -74,7 +76,8 @@ export function exportTodayCSV(dateISO: string, rows: DayExportRow[]) {
         .join(",")
     );
   }
-  if (rows.length === 0) lines.push(["", "", "Nothing scheduled", "", "", "", "", "", ""].map(csvCell).join(","));
+  if (rows.length === 0)
+    lines.push(["", "", "", "Nothing scheduled", "", "", "", "", "", ""].map(csvCell).join(","));
 
   download(`tasks-${dateISO}.csv`, lines.join("\n"), "text/csv;charset=utf-8");
 }
