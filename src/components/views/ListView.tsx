@@ -9,7 +9,7 @@ import { StatusControl } from "@/components/ui/StatusControl";
 import { TagChip } from "@/components/ui/TagChip";
 import { AssigneePicker, DuePicker, PrioritySelect } from "@/components/task/Pickers";
 import { QuickAdd } from "@/components/task/TaskRow";
-import { cn } from "@/lib/utils";
+import { cn, taskAssignees } from "@/lib/utils";
 
 type Actions = ReturnType<typeof useTaskActions>;
 
@@ -137,8 +137,8 @@ function Row({
           />
           <PrioritySelect value={task.priority} onChange={(p) => actions.setPriority(task.id, p)} />
           <AssigneePicker
-            value={{ id: task.assigneeId, name: task.assigneeName, avatar: task.assigneeAvatar }}
-            onChange={(a) => actions.setAssignee(task.id, a)}
+            value={taskAssignees(task)}
+            onChange={(a) => actions.setAssignees(task.id, a)}
             size={20}
           />
         </div>

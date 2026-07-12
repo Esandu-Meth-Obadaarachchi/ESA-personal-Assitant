@@ -8,7 +8,7 @@ import { createTask, deleteTaskTree, updateTask } from "./firestore";
 import { collectSubtreeIds } from "./tree";
 import { deleteCalendarEvent, syncTaskToCalendar } from "@/lib/api";
 import { toISODate } from "@/lib/date";
-import type { Recurrence, Task, TaskPriority, TaskStatus, TimeEntry } from "@/lib/types";
+import type { Assignee, Recurrence, Task, TaskPriority, TaskStatus, TimeEntry } from "@/lib/types";
 
 function advance(iso: string, r: Recurrence): string {
   const d = new Date(iso);
@@ -108,12 +108,17 @@ export function useTaskActions() {
         syncTaskToCalendar(id);
       },
       setTags: (id: string, tags: string[]) => updateTask(id, { tags }),
-      setAssignee: (id: string, a: { id: string; name: string; avatar?: string | null } | null) =>
-        updateTask(id, {
-          assigneeId: a?.id ?? null,
-          assigneeName: a?.name ?? null,
-          assigneeAvatar: a?.avatar ?? null,
-        }),
+      setAssignees: (id: string, list: Assignee[]) => {
+        // Keep the legacy single-assignee fields mirroring the first entry so
+        // anything still reading assigneeId (print, older data) stays correct.
+        const first = list[0] ?? null;
+        return updateTask(id, {
+          assignees: list,
+          assigneeId: first?.id ?? null,
+          assigneeName: first?.name ?? null,
+          assigneeAvatar: first?.avatar ?? null,
+        });
+      },
       toggleDone: (t: Task) => applyStatus(t.id, t.status === "done" ? "todo" : "done"),
       remove: (id: string) => {
         const ids = collectSubtreeIds(tasks, id);

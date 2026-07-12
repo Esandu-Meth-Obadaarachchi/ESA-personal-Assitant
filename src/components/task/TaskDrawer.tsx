@@ -10,7 +10,7 @@ import { clearPresence, setPresence, watchPresence } from "@/lib/data/firestore"
 import { useTaskActions } from "@/lib/data/useTaskActions";
 import { postJSON } from "@/lib/api";
 import { relativeTime } from "@/lib/date";
-import { shortId } from "@/lib/utils";
+import { shortId, taskAssignees } from "@/lib/utils";
 import { Avatar } from "@/components/ui/Avatar";
 import { StatusControl } from "@/components/ui/StatusControl";
 import { Button } from "@/components/ui/Button";
@@ -146,10 +146,10 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
             <Prop label="Priority">
               <PrioritySelect value={live.priority} onChange={(p) => actions.setPriority(live.id, p)} />
             </Prop>
-            <Prop label="Assignee">
+            <Prop label="Assignees">
               <AssigneePicker
-                value={{ id: live.assigneeId, name: live.assigneeName, avatar: live.assigneeAvatar }}
-                onChange={(a) => actions.setAssignee(live.id, a)}
+                value={taskAssignees(live)}
+                onChange={(a) => actions.setAssignees(live.id, a)}
               />
             </Prop>
             <Prop label="Due date">

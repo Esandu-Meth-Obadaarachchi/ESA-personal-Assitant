@@ -1,9 +1,18 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { Assignee, Task } from "./types";
 
 /** Merge conditional class names and de-dupe conflicting Tailwind utilities. */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/** All assignees on a task, reading the new array and falling back to the
+ *  legacy single-assignee fields for tasks written before multi-assignee. */
+export function taskAssignees(t: Pick<Task, "assignees" | "assigneeId" | "assigneeName" | "assigneeAvatar">): Assignee[] {
+  if (t.assignees?.length) return t.assignees;
+  if (t.assigneeId) return [{ id: t.assigneeId, name: t.assigneeName ?? "", avatar: t.assigneeAvatar }];
+  return [];
 }
 
 /** Deterministic initials for an avatar fallback. */

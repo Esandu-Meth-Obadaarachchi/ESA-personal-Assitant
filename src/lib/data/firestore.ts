@@ -290,6 +290,9 @@ export async function createTask(input: NewTaskInput): Promise<string> {
     notes: "",
     status: input.status ?? "todo",
     priority: input.priority ?? "med",
+    assignees: input.assignee
+      ? [{ id: input.assignee.id, name: input.assignee.name, avatar: input.assignee.avatar ?? null }]
+      : [],
     assigneeId: input.assignee?.id ?? null,
     assigneeName: input.assignee?.name ?? null,
     assigneeAvatar: input.assignee?.avatar ?? null,

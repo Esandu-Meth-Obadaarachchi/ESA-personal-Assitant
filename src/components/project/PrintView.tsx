@@ -7,6 +7,7 @@ import { buildTree } from "@/lib/data/tree";
 import { statusMeta } from "@/lib/constants";
 import { dueLabel, formatDuration } from "@/lib/date";
 import { taskSeconds } from "@/lib/export";
+import { taskAssignees } from "@/lib/utils";
 
 /**
  * Single-page, print-friendly render of a project + its full task tree.
@@ -104,7 +105,9 @@ function Row({ node }: { node: TaskNode }) {
           {node.tags.length > 0 && <span>{node.tags.map((t) => `#${t}`).join(" ")}</span>}
           {secs > 0 && <span>{formatDuration(secs)}</span>}
           {node.dueDate && <span>{dueLabel(node.dueDate)}</span>}
-          {node.assigneeName && <span>{node.assigneeName}</span>}
+          {taskAssignees(node).length > 0 && (
+            <span>{taskAssignees(node).map((a) => a.name).join(", ")}</span>
+          )}
           <span className="uppercase tracking-wide">{meta.label}</span>
         </span>
       </div>

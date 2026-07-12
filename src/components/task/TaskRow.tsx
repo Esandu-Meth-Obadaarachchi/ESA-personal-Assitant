@@ -12,7 +12,7 @@ import { SubtaskProgress } from "@/components/ui/SubtaskProgress";
 import { TagChip } from "@/components/ui/TagChip";
 import { Dropdown, MenuItem } from "@/components/ui/Dropdown";
 import { AssigneePicker, DuePicker, PrioritySelect } from "./Pickers";
-import { cn } from "@/lib/utils";
+import { cn, taskAssignees } from "@/lib/utils";
 
 export function TaskRow({
   node,
@@ -101,8 +101,8 @@ export function TaskRow({
         {node.dueDate && <DueDateChip date={node.dueDate} time={node.dueTime} status={node.status} />}
         <PrioritySelect value={node.priority} onChange={(p) => actions.setPriority(node.id, p)} />
         <AssigneePicker
-          value={{ id: node.assigneeId, name: node.assigneeName, avatar: node.assigneeAvatar }}
-          onChange={(a) => actions.setAssignee(node.id, a)}
+          value={taskAssignees(node)}
+          onChange={(a) => actions.setAssignees(node.id, a)}
           size={20}
         />
 

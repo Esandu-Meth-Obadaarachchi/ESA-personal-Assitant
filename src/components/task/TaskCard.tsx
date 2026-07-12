@@ -3,12 +3,12 @@
 import type { Task } from "@/lib/types";
 import { childProgress } from "@/lib/data/tree";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
-import { Avatar } from "@/components/ui/Avatar";
+import { AssigneeStack } from "@/components/task/Pickers";
 import { DueDateChip } from "@/components/ui/DueDateChip";
 import { PriorityDot } from "@/components/ui/PriorityIndicator";
 import { SubtaskProgress } from "@/components/ui/SubtaskProgress";
 import { TagChip } from "@/components/ui/TagChip";
-import { cn } from "@/lib/utils";
+import { cn, taskAssignees } from "@/lib/utils";
 
 /** Kanban / board card. Reuses the same task metadata as the tree row. */
 export function TaskCard({
@@ -22,6 +22,7 @@ export function TaskCard({
 }) {
   const { tasks } = useWorkspace();
   const { done, total } = childProgress(tasks, task.id);
+  const assignees = taskAssignees(task);
 
   return (
     <div
@@ -57,9 +58,7 @@ export function TaskCard({
         {task.dueDate && <DueDateChip date={task.dueDate} time={task.dueTime} status={task.status} />}
         {total > 0 && <SubtaskProgress done={done} total={total} />}
         <div className="ml-auto">
-          {task.assigneeId && (
-            <Avatar name={task.assigneeName} src={task.assigneeAvatar} size={20} />
-          )}
+          {assignees.length > 0 && <AssigneeStack assignees={assignees} size={20} />}
         </div>
       </div>
     </div>

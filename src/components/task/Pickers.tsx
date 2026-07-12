@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, Repeat, X } from "lucide-react";
 import { PRIORITIES } from "@/lib/constants";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
-import type { Recurrence, RecurrenceFreq, TaskPriority } from "@/lib/types";
+import type { Assignee, Recurrence, RecurrenceFreq, TaskPriority } from "@/lib/types";
 import { Avatar, AvatarEmpty } from "@/components/ui/Avatar";
 import { Dropdown, MenuItem } from "@/components/ui/Dropdown";
 import { PriorityIndicator } from "@/components/ui/PriorityIndicator";
@@ -47,27 +47,34 @@ export function PrioritySelect({
 }
 
 export function AssigneePicker({
-  value,
+  value = [],
   onChange,
   size = 22,
 }: {
-  value?: { id?: string | null; name?: string | null; avatar?: string | null };
-  onChange: (a: { id: string; name: string; avatar?: string | null } | null) => void;
+  value?: Assignee[];
+  onChange: (a: Assignee[]) => void;
   size?: number;
 }) {
   const { currentWorkspace } = useWorkspace();
   const members = currentWorkspace?.members ?? [];
+  const selectedIds = new Set(value.map((a) => a.id));
+
+  const toggle = (m: { uid: string; name: string; photoURL?: string | null }) => {
+    if (selectedIds.has(m.uid)) {
+      onChange(value.filter((a) => a.id !== m.uid));
+    } else {
+      onChange([...value, { id: m.uid, name: m.name, avatar: m.photoURL ?? null }]);
+    }
+  };
+
+  const title = value.length ? value.map((a) => a.name).join(", ") : "Assign";
   return (
     <Dropdown
       width={220}
       align="right"
       trigger={() => (
-        <span className="grid place-items-center rounded-full hover:opacity-80" title={value?.name ?? "Assign"}>
-          {value?.id ? (
-            <Avatar name={value.name} src={value.avatar} size={size} />
-          ) : (
-            <AvatarEmpty size={size} />
-          )}
+        <span className="grid place-items-center rounded-full hover:opacity-80" title={title}>
+          {value.length ? <AssigneeStack assignees={value} size={size} /> : <AvatarEmpty size={size} />}
         </span>
       )}
     >
@@ -79,32 +86,64 @@ export function AssigneePicker({
           {members.map((m) => (
             <MenuItem
               key={m.uid}
-              active={m.uid === value?.id}
+              active={selectedIds.has(m.uid)}
               icon={<Avatar name={m.name} src={m.photoURL} size={18} />}
-              onClick={() => {
-                onChange({ id: m.uid, name: m.name, avatar: m.photoURL });
-                close();
-              }}
+              onClick={() => toggle(m)}
             >
               {m.name}
             </MenuItem>
           ))}
-          {value?.id && (
+          {value.length > 0 && (
             <>
               <div className="my-1 h-px bg-border" />
               <MenuItem
                 onClick={() => {
-                  onChange(null);
+                  onChange([]);
                   close();
                 }}
               >
-                Unassign
+                Clear all
               </MenuItem>
             </>
           )}
         </div>
       )}
     </Dropdown>
+  );
+}
+
+/** Overlapping avatars for a task's assignees, with a +N overflow badge. */
+export function AssigneeStack({
+  assignees,
+  size = 22,
+  max = 3,
+}: {
+  assignees: Assignee[];
+  size?: number;
+  max?: number;
+}) {
+  const shown = assignees.slice(0, max);
+  const extra = assignees.length - shown.length;
+  return (
+    <span className="flex items-center">
+      {shown.map((a, i) => (
+        <span
+          key={a.id}
+          className="rounded-full ring-1 ring-bg"
+          style={{ marginLeft: i === 0 ? 0 : -size * 0.32 }}
+        >
+          <Avatar name={a.name} src={a.avatar} size={size} />
+        </span>
+      ))}
+      {extra > 0 && (
+        <span
+          className="grid place-items-center rounded-full bg-surface-2 text-2xs font-medium text-text-muted ring-1 ring-bg"
+          style={{ width: size, height: size, marginLeft: -size * 0.32 }}
+        >
+          +{extra}
+        </span>
+      )}
+    </span>
   );
 }
 
