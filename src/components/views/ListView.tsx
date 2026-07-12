@@ -69,14 +69,12 @@ export function ListView({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
                   childrenByParent={childrenByParent}
                 />
               ))}
-              {status === "todo" && (
-                <div className={cn("px-2", rows.length > 0 && "border-t border-border/60")}>
-                  <QuickAdd placeholder="Add task" onAdd={(title) => actions.add(title, { status: "todo" })} />
-                </div>
-              )}
-              {rows.length === 0 && status !== "todo" && (
-                <div className="px-3 py-2.5 text-2xs text-text-faint">Nothing here</div>
-              )}
+              <div className={cn("px-2", rows.length > 0 && "border-t border-border/60")}>
+                <QuickAdd
+                  placeholder={`Add task to ${meta.label}`}
+                  onAdd={(title) => actions.add(title, { status })}
+                />
+              </div>
             </div>
           </section>
         );
