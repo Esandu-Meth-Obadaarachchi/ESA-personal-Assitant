@@ -48,7 +48,7 @@ export function ShareDialog({ workspace, open, onClose }: { workspace: Workspace
   // moment they sign in with that Google email.
   const copyInvite = (to: string) => {
     const url = typeof window !== "undefined" ? window.location.origin : "https://esa-ai-personal-assistant.netlify.app";
-    const msg = `You're invited to join "${workspace.name}" on ESA AI.\nOpen ${url} and sign in with Google using ${to} — you'll be added automatically.`;
+    const msg = `You're invited to join "${workspace.name}" on Luna.\nOpen ${url} and sign in with Google using ${to} — you'll be added automatically.`;
     navigator.clipboard?.writeText(msg).then(() => {
       setCopied(to);
       setTimeout(() => setCopied((c) => (c === to ? null : c)), 2200);

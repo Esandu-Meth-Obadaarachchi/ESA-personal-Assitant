@@ -1,6 +1,6 @@
 <div align="center">
 
-# ◭ ESA AI — Your Personal Assistant
+# 🌙 Luna — Your Personal AI Workspace
 
 **An AI-native project + knowledge manager. Notion-meets-Linear, powered by Claude.**
 
