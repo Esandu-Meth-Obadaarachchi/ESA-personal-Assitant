@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { CalendarCheck2, ChevronLeft, ChevronRight, Download, NotebookPen } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
@@ -22,6 +22,12 @@ export default function TodayPage() {
   const router = useRouter();
   const today = todayISO();
 
+  // The day the whole view is focused on. Defaults to today; the header and the
+  // notebook share this so navigating moves the task list and the planner together.
+  const [date, setDate] = useState(today);
+  const isToday = date === today;
+  const shiftDate = (days: number) => setDate((d) => toISODate(addDays(new Date(d), days)));
+
   // Project names across every workspace, so each task can show its project.
   const [projects, setProjects] = useState<Project[]>([]);
   useEffect(() => {
@@ -34,14 +40,16 @@ export default function TodayPage() {
     return m;
   }, [projects]);
 
-  // Every open task due today, from every workspace and project.
-  const dueToday = useMemo(
+  // Every open task due on the focused day, from every workspace and project.
+  const dueOnDate = useMemo(
     () =>
       allTasks
-        .filter((t) => t.status !== "done" && t.dueDate === today)
+        .filter((t) => t.status !== "done" && t.dueDate === date)
         .sort(byTimeThenPriority),
-    [allTasks, today]
+    [allTasks, date]
   );
+  // Overdue is always relative to the real today, and only shown when the view
+  // is focused on today — it makes no sense against a future or past day.
   const overdue = useMemo(
     () =>
       allTasks
@@ -49,28 +57,32 @@ export default function TodayPage() {
         .sort(byTimeThenPriority),
     [allTasks, today]
   );
-  const doneToday = allTasks.filter((t) => t.status === "done" && t.dueDate === today).length;
+  const showOverdue = isToday && overdue.length > 0;
+  const doneOnDate = allTasks.filter((t) => t.status === "done" && t.dueDate === date).length;
 
-  // Everything on the plate for today: due today (any status) + still-open overdue.
+  // Everything on the plate for the focused day: due that day (any status) +
+  // still-open overdue when the day in view is today.
   const exportToday = () => {
     const wsName = (id: string) => workspaces.find((w) => w.id === id)?.name;
     const rows: DayExportRow[] = [
       ...allTasks
-        .filter((t) => t.dueDate === today)
+        .filter((t) => t.dueDate === date)
         .map((t) => ({
           task: t,
           bucket: "Due today" as const,
           workspace: wsName(t.workspaceId),
           project: projName.get(t.projectId),
         })),
-      ...overdue.map((t) => ({
-        task: t,
-        bucket: "Overdue" as const,
-        workspace: wsName(t.workspaceId),
-        project: projName.get(t.projectId),
-      })),
+      ...(showOverdue
+        ? overdue.map((t) => ({
+            task: t,
+            bucket: "Overdue" as const,
+            workspace: wsName(t.workspaceId),
+            project: projName.get(t.projectId),
+          }))
+        : []),
     ];
-    exportTodayCSV(today, rows);
+    exportTodayCSV(date, rows);
   };
 
   const wsById = useMemo(() => {
@@ -99,18 +111,48 @@ export default function TodayPage() {
           <CalendarCheck2 className="h-[18px] w-[18px]" strokeWidth={1.75} />
         </span>
         <div className="min-w-0">
-          <h1 className="truncate text-[17px] font-semibold tracking-tight">{greeting()}</h1>
-          <div className="text-xs text-text-muted">{format(new Date(), "EEEE, d MMMM")}</div>
+          <h1 className="truncate text-[17px] font-semibold tracking-tight">
+            {isToday ? greeting() : dueLabel(date) || format(new Date(date), "EEEE")}
+          </h1>
+          <div className="text-xs text-text-muted">{format(new Date(date), "EEEE, d MMMM")}</div>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => shiftDate(-1)}
+              title="Previous day"
+              className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface-2 text-text-muted transition-colors hover:border-border-strong hover:text-text"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setDate(today)}
+              title="Jump to today"
+              className={cn(
+                "h-7 rounded-md border px-2.5 text-2xs font-medium transition-colors",
+                isToday
+                  ? "border-border bg-surface-2 text-text-faint"
+                  : "border-accent/30 bg-accent/10 text-accent hover:bg-accent/15"
+              )}
+            >
+              {isToday ? "Today" : "Back to today"}
+            </button>
+            <button
+              onClick={() => shiftDate(1)}
+              title="Next day"
+              className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface-2 text-text-muted transition-colors hover:border-border-strong hover:text-text"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
           <div className="hidden items-center gap-1.5 sm:flex">
-            <Stat label="due today" value={dueToday.length} />
-            {overdue.length > 0 && <Stat label="overdue" value={overdue.length} tone="danger" />}
-            {doneToday > 0 && <Stat label="done" value={doneToday} />}
+            <Stat label={isToday ? "due today" : "due"} value={dueOnDate.length} />
+            {showOverdue && <Stat label="overdue" value={overdue.length} tone="danger" />}
+            {doneOnDate > 0 && <Stat label="done" value={doneOnDate} />}
           </div>
           <button
             onClick={exportToday}
-            title="Export today's tasks as CSV"
+            title="Export the day's tasks as CSV"
             className="ml-1 inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2.5 text-2xs font-medium text-text-muted transition-colors hover:border-border-strong hover:text-text"
           >
             <Download className="h-3.5 w-3.5" /> Export
@@ -122,14 +164,18 @@ export default function TodayPage() {
         {/* Left: the day's tasks */}
         <section className="space-y-6">
           <TaskGroup
-            title="Due today"
-            tasks={dueToday}
+            title={isToday ? "Due today" : `Due ${dueLabel(date) || format(new Date(date), "d MMM")}`}
+            tasks={dueOnDate}
             wsById={wsById}
             projName={projName}
             onOpen={openTask}
-            empty="Nothing is due today. Enjoy the quiet, or pull something forward."
+            empty={
+              isToday
+                ? "Nothing is due today. Enjoy the quiet, or pull something forward."
+                : "Nothing is due on this day."
+            }
           />
-          {overdue.length > 0 && (
+          {showOverdue && (
             <TaskGroup
               title="Overdue"
               tasks={overdue}
@@ -141,8 +187,8 @@ export default function TodayPage() {
           )}
         </section>
 
-        {/* Right: the notebook */}
-        <Notebook uid={user.uid} today={today} />
+        {/* Right: the notebook, following the same focused day */}
+        <Notebook uid={user.uid} date={date} setDate={setDate} today={today} />
       </div>
     </div>
   );
@@ -217,9 +263,19 @@ function TaskGroup({
   );
 }
 
-/** A per-day personal notebook that autosaves to Firestore. */
-function Notebook({ uid, today }: { uid: string; today: string }) {
-  const [date, setDate] = useState(today);
+/** A per-day personal notebook that autosaves to Firestore. Its day is driven by
+ *  the page so the task list and the planner always move together. */
+function Notebook({
+  uid,
+  date,
+  setDate,
+  today,
+}: {
+  uid: string;
+  date: string;
+  setDate: Dispatch<SetStateAction<string>>;
+  today: string;
+}) {
   const [content, setContent] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const editingRef = useRef(false);
