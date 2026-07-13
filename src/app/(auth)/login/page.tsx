@@ -102,7 +102,7 @@ export default function LandingPage() {
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
         <div className="flex items-center gap-2.5">
           <Logo size={26} />
-          <span className="text-[15px] font-semibold tracking-tight">ESA AI</span>
+          <span className="text-[15px] font-semibold tracking-[0.14em]">LUNA</span>
         </div>
         <button
           onClick={handleSignIn}
@@ -243,7 +243,7 @@ export default function LandingPage() {
             style={{ background: "radial-gradient(30rem 16rem at 50% -20%, rgb(245 197 24 / 0.14), transparent 70%)" }}
           />
           <div className="relative">
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-[2rem]">Start your second brain</h2>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-[2rem]">Begin with Luna</h2>
             <p className="mx-auto mt-2 max-w-sm text-[14px] text-text-muted">
               We create a private workspace on first sign-in. Your data stays in your own instances.
             </p>
@@ -259,7 +259,7 @@ export default function LandingPage() {
           </div>
         </div>
         <p className="mt-8 text-center text-2xs text-text-faint">
-          © {new Date().getFullYear()} ESA AI · Built by Esandu
+          © {new Date().getFullYear()} Luna · Built by Esandu
         </p>
       </section>
     </div>

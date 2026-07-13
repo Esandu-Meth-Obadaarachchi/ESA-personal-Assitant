@@ -4,9 +4,9 @@ import { AuthProvider } from "@/lib/auth/AuthContext";
 import { ThemeProvider } from "@/lib/theme/ThemeContext";
 
 export const metadata: Metadata = {
-  title: "ESA AI - Your Personal Assistant",
+  title: "Luna · Your Personal AI Workspace",
   description:
-    "AI-native project and knowledge manager. Projects, tasks and a Claude agent that knows all your work.",
+    "Luna is an AI-native project and knowledge workspace. Projects, tasks and a Claude agent that knows all your work.",
 };
 
 export const viewport: Viewport = {
