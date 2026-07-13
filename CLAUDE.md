@@ -4,7 +4,7 @@ Read this first in any session. It is the map of the codebase and the rules for 
 
 ## What this is
 
-Shipped as **Luna — Your Personal AI Workspace** (product name; the codebase/package is still `second-brain`). An AI-native project + knowledge manager. Notion-meets-Linear feel: dense, dark, keyboard-friendly. Pillars on one backend:
+Shipped as **Lune AI — Your Personal Workspace** (product name; the codebase/package is still `second-brain`). An AI-native project + knowledge manager. Notion-meets-Linear feel: dense, dark, keyboard-friendly. Pillars on one backend:
 
 1. **Execution** — Workspace -> Project -> Task -> Subtask (recursive). Seven per-project views: Tree, Board (Kanban), List, Calendar, Map (React Flow mind map), Draw (Excalidraw whiteboard) and Docs (project pages). List/Board only ever show top-level tasks with subtasks nested underneath.
 2. **Knowledge** — per-project RAG. Upload docs, they are chunked, embedded (Voyage) and stored in Pinecone.

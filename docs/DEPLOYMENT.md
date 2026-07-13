@@ -1,6 +1,6 @@
 # Deployment
 
-The app is hosted on **Netlify** as **Luna** at https://esa-ai-personal-assistant.netlify.app. Manual deploys for now — no CI/CD. Firebase (Auth + Firestore) is the backend and is deployed separately with the Firebase CLI.
+The app is hosted on **Netlify** as **Lune AI** at https://esa-ai-personal-assistant.netlify.app. Manual deploys for now — no CI/CD. Firebase (Auth + Firestore) is the backend and is deployed separately with the Firebase CLI.
 
 ## The two things that deploy separately
 

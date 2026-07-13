@@ -42,7 +42,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
         </button>
         <Logo size={20} />
         <span className="truncate text-[13px] font-medium text-text">
-          {currentWorkspace ? `${currentWorkspace.emoji} ${currentWorkspace.name}` : "Luna"}
+          {currentWorkspace ? `${currentWorkspace.emoji} ${currentWorkspace.name}` : "Lune AI"}
         </span>
       </header>
 
@@ -80,7 +80,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col items-center gap-4 animate-fade-in">
             <Logo size={40} className="animate-pulse-dot" />
             <div className="text-center">
-              <div className="text-sm font-medium text-text">Setting up Luna</div>
+              <div className="text-sm font-medium text-text">Setting up Lune</div>
               <div className="mt-1 text-xs text-text-muted">
                 Creating your workspaces and a few starter projects…
               </div>

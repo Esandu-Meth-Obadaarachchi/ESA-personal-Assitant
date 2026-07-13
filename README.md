@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌙 Luna — Your Personal AI Workspace
+# 🌙 Lune AI — Your Personal Workspace
 
 **An AI-native project + knowledge manager. Notion-meets-Linear, powered by Claude.**
 

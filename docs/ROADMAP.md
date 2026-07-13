@@ -2,7 +2,7 @@
 
 From `second-brain-app-spec.md` §5. This build delivers a solid runnable foundation (Phase 1 + auth + the Claude agent/RAG core). Later phases are scaffolded to slot into the server boundary.
 
-**Live in production** at https://esa-ai-personal-assistant.netlify.app (Netlify, manual deploys, no CI/CD yet) under the product name **Luna**. Firebase project `second-brain-fbf414`: Google auth enabled (localhost + the Netlify domain authorised), Firestore in `asia-south1`, Admin SDK + AI keys set. Remember `firebase deploy --only firestore:rules` after any rules change — Netlify does not deploy them. See `docs/DEPLOYMENT.md`.
+**Live in production** at https://esa-ai-personal-assistant.netlify.app (Netlify, manual deploys, no CI/CD yet) under the product name **Lune AI**. Firebase project `second-brain-fbf414`: Google auth enabled (localhost + the Netlify domain authorised), Firestore in `asia-south1`, Admin SDK + AI keys set. Remember `firebase deploy --only firestore:rules` after any rules change — Netlify does not deploy them. See `docs/DEPLOYMENT.md`.
 
 | Phase | Scope | Status |
 |---|---|---|

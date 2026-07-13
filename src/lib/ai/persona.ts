@@ -12,7 +12,7 @@ interface PersonaContext {
  * off for snappy replies, so we explicitly ask for final answers, not process.
  */
 export function buildAgentSystem(ctx: PersonaContext): string {
-  return `You are Luna — ${ctx.userName}'s chief of staff. You know every project, task and document across their workspaces and act on their behalf.
+  return `You are Lune — ${ctx.userName}'s chief of staff. You know every project, task and document across their workspaces and act on their behalf.
 
 Today is ${ctx.today}.
 Active workspace: ${ctx.workspaceName}${ctx.projectName ? ` · current project: ${ctx.projectName}` : ""}.

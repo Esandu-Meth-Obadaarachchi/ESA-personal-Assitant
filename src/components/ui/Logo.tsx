@@ -1,13 +1,13 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The Luna mark — a gold gradient crescent moon with a small accent star, set
+ * The Lune mark — a gold gradient crescent moon with a small accent star, set
  * in a dark medallion with a hairline gold ring and a soft glow. Rendered as an
  * SVG so it stays crisp at every size, from a 16px favicon to the login hero.
  */
 export function Logo({ size = 26, className }: { size?: number; className?: string }) {
   // Stable-ish unique ids so multiple logos on one page don't clash their defs.
-  const uid = `luna-${size}`;
+  const uid = `lune-${size}`;
   return (
     <div
       className={cn(
@@ -53,7 +53,7 @@ export function Wordmark({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <Logo />
-      <span className="text-[15px] font-semibold tracking-[0.14em] text-text">LUNA</span>
+      <span className="text-[15px] font-semibold tracking-tight text-text">Lune AI</span>
     </div>
   );
 }
