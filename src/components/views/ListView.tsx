@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { PRIORITY_ORDER, STATUS_ORDER, statusMeta } from "@/lib/constants";
+import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { useTaskActions } from "@/lib/data/useTaskActions";
 import type { Task, TaskStatus } from "@/lib/types";
@@ -13,6 +14,7 @@ import { cn, taskAssignees } from "@/lib/utils";
 
 type Actions = ReturnType<typeof useTaskActions>;
 
+/** Priority, then earliest due date. Assignment is layered on top in the view. */
 function sortTasks(a: Task, b: Task): number {
   const p = PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority);
   if (p !== 0) return p;
@@ -20,8 +22,21 @@ function sortTasks(a: Task, b: Task): number {
 }
 
 export function ListView({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
+  const { user } = useAuth();
   const { tasks } = useWorkspace();
   const actions = useTaskActions();
+
+  // Tasks I am assigned to float to the top of each status group; ties fall back
+  // to the usual priority-then-due order.
+  const sortMineFirst = useMemo(() => {
+    const mine = (t: Task) => taskAssignees(t).some((x) => x.id === user?.uid);
+    return (a: Task, b: Task) => {
+      const am = mine(a) ? 0 : 1;
+      const bm = mine(b) ? 0 : 1;
+      if (am !== bm) return am - bm;
+      return sortTasks(a, b);
+    };
+  }, [user?.uid]);
 
   // Subtasks are nested under their parent, never floated as their own status
   // row. So we group only top-level tasks by status; children render indented
@@ -41,9 +56,9 @@ export function ListView({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
   const groups = useMemo(() => {
     const g: Record<TaskStatus, Task[]> = { todo: [], in_progress: [], blocked: [], done: [] };
     tasks.filter((t) => !t.parentId).forEach((t) => g[t.status].push(t));
-    (Object.keys(g) as TaskStatus[]).forEach((s) => g[s].sort(sortTasks));
+    (Object.keys(g) as TaskStatus[]).forEach((s) => g[s].sort(sortMineFirst));
     return g;
-  }, [tasks]);
+  }, [tasks, sortMineFirst]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-4">

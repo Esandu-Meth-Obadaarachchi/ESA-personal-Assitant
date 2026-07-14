@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ListTree } from "lucide-react";
+import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { useTaskActions } from "@/lib/data/useTaskActions";
 import { buildTree, flattenVisible } from "@/lib/data/tree";
@@ -15,13 +16,14 @@ export function TreeView({
   onOpenTask: (t: Task) => void;
   selectedId?: string;
 }) {
+  const { user } = useAuth();
   const { tasks } = useWorkspace();
   const actions = useTaskActions();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [addingUnder, setAddingUnder] = useState<string | null>(null);
 
   const roots = useMemo(() => {
-    const tree = buildTree(tasks);
+    const tree = buildTree(tasks, user?.uid);
     const annotate = (nodes: ReturnType<typeof buildTree>) =>
       nodes.forEach((n) => {
         n.collapsed = collapsed.has(n.id);
@@ -29,7 +31,7 @@ export function TreeView({
       });
     annotate(tree);
     return tree;
-  }, [tasks, collapsed]);
+  }, [tasks, collapsed, user?.uid]);
 
   const visible = useMemo(() => flattenVisible(roots), [roots]);
 

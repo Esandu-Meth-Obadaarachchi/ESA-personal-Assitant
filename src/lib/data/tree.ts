@@ -1,4 +1,5 @@
 import type { Task, TaskNode } from "@/lib/types";
+import { taskAssignees } from "@/lib/utils";
 
 export function slugifyNamespace(input: string): string {
   return input
@@ -8,8 +9,12 @@ export function slugifyNamespace(input: string): string {
     .slice(0, 60);
 }
 
-/** Build the Project -> Task -> Subtask forest from a flat task list. */
-export function buildTree(tasks: Task[]): TaskNode[] {
+/**
+ * Build the Project -> Task -> Subtask forest from a flat task list.
+ * When `myUid` is given, tasks the current user is assigned to float to the top
+ * of each sibling group so they are easy to spot in a big shared project.
+ */
+export function buildTree(tasks: Task[], myUid?: string): TaskNode[] {
   const byId = new Map<string, TaskNode>();
   tasks.forEach((t) => byId.set(t.id, { ...t, children: [], depth: 0 }));
 
@@ -20,12 +25,19 @@ export function buildTree(tasks: Task[]): TaskNode[] {
     else roots.push(node);
   });
 
-  // Completed tasks sink to the bottom of their sibling group, then normal order.
+  const mine = (t: Task) => !!myUid && taskAssignees(t).some((a) => a.id === myUid);
+
+  // Completed tasks sink to the bottom; among the rest, mine float to the top;
+  // ties keep their manual order.
   const sortRec = (nodes: TaskNode[], depth: number) => {
     nodes.sort((a, b) => {
       const ad = a.status === "done" ? 1 : 0;
       const bd = b.status === "done" ? 1 : 0;
-      return ad - bd || a.order - b.order;
+      if (ad !== bd) return ad - bd;
+      const am = mine(a) ? 0 : 1;
+      const bm = mine(b) ? 0 : 1;
+      if (am !== bm) return am - bm;
+      return a.order - b.order;
     });
     nodes.forEach((n) => {
       n.depth = depth;
