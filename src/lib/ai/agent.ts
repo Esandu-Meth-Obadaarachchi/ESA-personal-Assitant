@@ -39,8 +39,10 @@ export async function runAgent(
     projectList: ctx.projects.map((p) => `- ${p.name}`).join("\n"),
   });
 
+  // Send only the last 5 turns as context. Keeps the model prompt small and
+  // the token cost down; the full conversation is persisted in Firestore.
   const messages: Anthropic.MessageParam[] = [
-    ...history.slice(-10).map((h) => ({ role: h.role, content: h.content })),
+    ...history.slice(-5).map((h) => ({ role: h.role, content: h.content })),
     { role: "user", content: message },
   ];
 

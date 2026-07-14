@@ -17,7 +17,20 @@ import {
 import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase/client";
 import { PROJECT_COLORS } from "@/lib/constants";
-import type { DayPlan, Page, Presence, Project, Task, Whiteboard, Workspace, WorkspaceMember } from "@/lib/types";
+import type {
+  AgentCard,
+  Chat,
+  ChatMessage,
+  DayPlan,
+  Page,
+  Presence,
+  Project,
+  RetrievedChunk,
+  Task,
+  Whiteboard,
+  Workspace,
+  WorkspaceMember,
+} from "@/lib/types";
 import { slugifyNamespace } from "./tree";
 
 /**
@@ -650,4 +663,100 @@ export function watchPresence(uid: string, taskId: string, cb: (p: Presence[]) =
     },
     (err) => console.error("watchPresence error", err)
   );
+}
+
+/* ---------------------------- agent chat history --------------------------- */
+
+/**
+ * Live list of a user's saved chats in a workspace. Single-field
+ * `array-contains` query (no composite index), filtered + sorted in JS.
+ */
+export function watchChats(uid: string, workspaceId: string, cb: (c: Chat[]) => void): Unsubscribe {
+  const q = query(collection(requireDb(), "chats"), where("memberIds", "array-contains", uid));
+  return onSnapshot(
+    q,
+    (snap) => {
+      cb(
+        snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as Omit<Chat, "id">) }))
+          .filter((c) => c.workspaceId === workspaceId)
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+      );
+    },
+    (err) => console.error("watchChats error", err)
+  );
+}
+
+/** Create a new chat, titled from its first message. Returns the new id. */
+export async function createChat(uid: string, workspaceId: string, title: string): Promise<string> {
+  const now = Date.now();
+  const ref = await addDoc(collection(requireDb(), "chats"), {
+    uid,
+    workspaceId,
+    title: title.trim().slice(0, 80) || "New chat",
+    createdAt: now,
+    updatedAt: now,
+    memberIds: [uid],
+  } as Omit<Chat, "id">);
+  return ref.id;
+}
+
+/** Bump a chat's updatedAt (so it sorts to the top), optionally retitling it. */
+export async function touchChat(chatId: string, patch: { title?: string } = {}): Promise<void> {
+  await updateDoc(doc(requireDb(), "chats", chatId), { updatedAt: Date.now(), ...patch });
+}
+
+/** Delete a chat and all of its messages in one batch. */
+export async function deleteChat(chatId: string): Promise<void> {
+  const database = requireDb();
+  const msgs = await getDocs(query(collection(database, "chatMessages"), where("chatId", "==", chatId)));
+  const batch = writeBatch(database);
+  msgs.docs.forEach((d) => batch.delete(d.ref));
+  batch.delete(doc(database, "chats", chatId));
+  await batch.commit();
+}
+
+/**
+ * Persist one turn. Cards are serialised to JSON (their `data` is loosely typed
+ * and may nest arrays, which Firestore rejects as native fields — the same
+ * trick whiteboards use for Excalidraw scenes).
+ */
+export async function addChatMessage(chatId: string, uid: string, msg: ChatMessage): Promise<void> {
+  await addDoc(collection(requireDb(), "chatMessages"), {
+    chatId,
+    uid,
+    role: msg.role,
+    content: msg.content,
+    steps: msg.steps ?? [],
+    sources: msg.sources ?? [],
+    cardsJson: msg.cards ? JSON.stringify(msg.cards) : "",
+    createdAt: msg.createdAt,
+    memberIds: [uid],
+  });
+}
+
+/** Load a chat's turns in order. Single-field query, sorted in JS. */
+export async function loadChatMessages(chatId: string): Promise<ChatMessage[]> {
+  const snap = await getDocs(query(collection(requireDb(), "chatMessages"), where("chatId", "==", chatId)));
+  return snap.docs
+    .map((d) => {
+      const data = d.data() as {
+        role: "user" | "assistant";
+        content: string;
+        steps?: string[];
+        sources?: RetrievedChunk[];
+        cardsJson?: string;
+        createdAt: number;
+      };
+      return {
+        id: d.id,
+        role: data.role,
+        content: data.content,
+        steps: data.steps,
+        sources: data.sources,
+        cards: data.cardsJson ? (JSON.parse(data.cardsJson) as AgentCard[]) : undefined,
+        createdAt: data.createdAt,
+      } satisfies ChatMessage;
+    })
+    .sort((a, b) => a.createdAt - b.createdAt);
 }

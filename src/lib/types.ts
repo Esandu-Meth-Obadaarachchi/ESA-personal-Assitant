@@ -248,6 +248,21 @@ export interface ChatMessage {
   pending?: boolean;
 }
 
+/**
+ * A saved agent conversation. Personal to one user (`memberIds` is always the
+ * single owner uid) and scoped to a workspace. The turns live in the
+ * `chatMessages` collection, keyed by `chatId`.
+ */
+export interface Chat {
+  id: string;
+  uid: string;
+  workspaceId: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  memberIds: string[];
+}
+
 export interface StandupDigest {
   overdue: Task[];
   dueToday: Task[];
