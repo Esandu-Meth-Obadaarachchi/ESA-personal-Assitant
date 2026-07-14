@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropic, CLAUDE_MODEL } from "./anthropic";
 import { buildAgentSystem } from "./persona";
+import { checkGrounded } from "./retrieval";
 import { TOOLS, executeTool, type ToolContext } from "./tools";
 import type { AgentCard, RetrievedChunk } from "@/lib/types";
 
@@ -55,12 +56,31 @@ export async function runAgent(
     });
 
     if (resp.stop_reason !== "tool_use") {
-      const answer = resp.content
+      let answer = resp.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text)
         .join("\n")
         .trim();
-      return { answer, steps: ctx.steps, sources: dedupe(ctx.sources), cards: ctx.cards };
+      const sources = dedupe(ctx.sources);
+      // Grounded self-check: when the answer drew on retrieved documents, verify
+      // every claim is supported. A miss appends a subtle caveat instead of
+      // presenting an unverified answer as fact. See docs/AGENTIC_RAG.md.
+      if (sources.length > 0 && answer) {
+        try {
+          const grounded = await checkGrounded(answer, sources);
+          ctx.steps.push(
+            grounded
+              ? `groundedness check: passed (${sources.length} source(s))`
+              : "groundedness check: some claims unverified"
+          );
+          if (!grounded) {
+            answer += "\n\n_Note: parts of this answer may not be fully backed by your documents._";
+          }
+        } catch {
+          /* non-fatal — never block a reply on the self-check */
+        }
+      }
+      return { answer, steps: ctx.steps, sources, cards: ctx.cards };
     }
 
     messages.push({ role: "assistant", content: resp.content });
