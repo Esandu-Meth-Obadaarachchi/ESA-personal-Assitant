@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/firebase/admin";
 import { loadWorkspace } from "@/lib/ai/server";
 import { runAgent, type AgentTurn } from "@/lib/ai/agent";
 import type { ToolContext } from "@/lib/ai/tools";
+import { MAX_CHAT_INPUT_CHARS } from "@/lib/constants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
       steps: [],
     };
 
-    const result = await runAgent(message, history ?? [], ctx, {
+    const result = await runAgent(message.slice(0, MAX_CHAT_INPUT_CHARS), history ?? [], ctx, {
       workspaceName: ws.name,
       projectName: projects.find((p) => p.id === projectId)?.name,
     });
