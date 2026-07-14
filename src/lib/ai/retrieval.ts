@@ -16,8 +16,8 @@ import { queryNamespaces } from "./pinecone";
 import type { RetrievedChunk } from "@/lib/types";
 
 const CANDIDATES = 20; // wide net from the bi-encoder (recall)
-const KEEP = 5; // kept after the cross-encoder rerank (precision)
-const MAX_ATTEMPTS = 3; // grade-and-retry ceiling
+const KEEP = 4; // kept after the cross-encoder rerank (precision, and prompt size)
+const MAX_ATTEMPTS = 2; // grade-and-retry ceiling (each retry costs helper calls)
 
 export interface AgenticRetrieval {
   chunks: RetrievedChunk[];

@@ -16,6 +16,7 @@ import {
 } from "@/lib/data/firestore";
 import { computeDigest } from "@/lib/data/standup";
 import { postJSON } from "@/lib/api";
+import { MAX_CHAT_INPUT_CHARS } from "@/lib/constants";
 import type { Chat, ChatMessage, Task } from "@/lib/types";
 import { StandupCard } from "@/components/agent/StandupCard";
 import { AgentMessage } from "@/components/agent/AgentMessage";
@@ -227,6 +228,7 @@ export default function AgentPage() {
                   }
                 }}
                 rows={1}
+                maxLength={MAX_CHAT_INPUT_CHARS}
                 placeholder="Ask the brain anything…"
                 className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[13.5px] text-text outline-none placeholder:text-text-faint"
               />

@@ -56,3 +56,7 @@ export const PROJECT_COLORS = [
 ];
 
 export const WORKSPACE_EMOJIS = ["🏢", "💼", "🚀", "🌿", "🎓", "🏨", "⚡", "🧠"];
+
+/** Max characters for a single agent chat message. Caps input tokens and cost;
+ *  enforced on the composer and again server-side in /api/chat. */
+export const MAX_CHAT_INPUT_CHARS = 2000;

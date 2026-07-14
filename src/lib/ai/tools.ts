@@ -153,7 +153,7 @@ export async function executeTool(
       if (chunks.length) ctx.cards.push({ kind: "sources", data: chunks });
       if (!chunks.length) return "No matching documents found in the knowledge base.";
       return JSON.stringify(
-        chunks.map((c) => ({ source: c.source, project: c.project, score: c.score.toFixed(2), text: c.text.slice(0, 700) }))
+        chunks.map((c) => ({ source: c.source, project: c.project, score: c.score.toFixed(2), text: c.text.slice(0, 500) }))
       );
     }
 
