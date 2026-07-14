@@ -98,6 +98,8 @@ Written/read only by `lib/share/server.ts` (admin). On the invitee's first sign-
 
 The task tree is stored flat and assembled client-side (`lib/data/tree.ts` -> `buildTree`). Subtasks nest arbitrarily deep via `parentId`. The page tree works the same way via `Page.parentId`.
 
+Sibling ordering inside each group (Tree and List) is: done tasks sink to the bottom, then tasks the current user is an assignee of float to the top, then manual `order`. Pass the viewer's uid to `buildTree(tasks, myUid)` to get the assignee float; List applies the same rule on top of its priority-then-due sort. Kanban Board and Mind Map keep pure manual `order` — column position and graph layout there are user-placed, so assignment must not reshuffle them.
+
 ## Isolation
 
 `firestore.rules` gates every operation on `request.auth.uid in resource.data.memberIds`. Businesses are fully separated — switching workspaces never leaks data. The server (agent) uses `firebase-admin`, which bypasses rules, so `src/lib/ai/server.ts` re-checks membership in code before any read/write.
