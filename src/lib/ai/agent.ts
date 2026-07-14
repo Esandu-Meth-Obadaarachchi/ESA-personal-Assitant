@@ -5,6 +5,11 @@ import { checkGrounded } from "./retrieval";
 import { TOOLS, executeTool, type ToolContext } from "./tools";
 import type { AgentCard, RetrievedChunk } from "@/lib/types";
 
+// Cost caps. Output tokens are the expensive side (Opus), and each tool round
+// re-sends the growing context, so both are bounded.
+const MAX_ANSWER_TOKENS = 1024; // ceiling on generated output per reply
+const MAX_TOOL_ROUNDS = 4; // ceiling on tool-loop iterations
+
 export interface AgentTurn {
   role: "user" | "assistant";
   content: string;
@@ -48,10 +53,10 @@ export async function runAgent(
 
   const client = anthropic();
 
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < MAX_TOOL_ROUNDS; i++) {
     const resp = await client.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 4096,
+      max_tokens: MAX_ANSWER_TOKENS,
       system,
       tools: TOOLS,
       messages,
