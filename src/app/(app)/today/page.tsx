@@ -10,11 +10,12 @@ import { addDays, format } from "date-fns";
 import { dueLabel, greeting, toISODate, todayISO } from "@/lib/date";
 import type { Project, Task, Workspace } from "@/lib/types";
 import { DueDateChip } from "@/components/ui/DueDateChip";
+import { AssigneeStack } from "@/components/task/Pickers";
 import { PriorityDot } from "@/components/ui/PriorityIndicator";
 import { Logo } from "@/components/ui/Logo";
 import { PRIORITY_ORDER } from "@/lib/constants";
 import { exportTodayCSV, type DayExportRow } from "@/lib/export";
-import { cn } from "@/lib/utils";
+import { cn, taskAssignees } from "@/lib/utils";
 
 export default function TodayPage() {
   const { user } = useAuth();
@@ -34,20 +35,31 @@ export default function TodayPage() {
     return m;
   }, [projects]);
 
+  // Tasks assigned to me sort to the top; ties fall back to time then priority.
+  const sortMineFirst = useMemo(() => {
+    const mine = (t: Task) => taskAssignees(t).some((a) => a.id === user?.uid);
+    return (a: Task, b: Task) => {
+      const am = mine(a);
+      const bm = mine(b);
+      if (am !== bm) return am ? -1 : 1;
+      return byTimeThenPriority(a, b);
+    };
+  }, [user?.uid]);
+
   // Every open task due today, from every workspace and project.
   const dueToday = useMemo(
     () =>
       allTasks
         .filter((t) => t.status !== "done" && t.dueDate === today)
-        .sort(byTimeThenPriority),
-    [allTasks, today]
+        .sort(sortMineFirst),
+    [allTasks, today, sortMineFirst]
   );
   const overdue = useMemo(
     () =>
       allTasks
         .filter((t) => t.status !== "done" && !!t.dueDate && t.dueDate < today)
-        .sort(byTimeThenPriority),
-    [allTasks, today]
+        .sort(sortMineFirst),
+    [allTasks, today, sortMineFirst]
   );
   const doneToday = allTasks.filter((t) => t.status === "done" && t.dueDate === today).length;
 
@@ -198,6 +210,11 @@ function TaskGroup({
             >
               <PriorityDot priority={t.priority} />
               <span className="flex-1 truncate text-[13px] text-text">{t.title}</span>
+              {taskAssignees(t).length > 0 && (
+                <span className="shrink-0">
+                  <AssigneeStack assignees={taskAssignees(t)} size={18} max={3} />
+                </span>
+              )}
               <span className="hidden shrink-0 items-center gap-1 text-2xs text-text-faint sm:flex">
                 {wsById.get(t.workspaceId)?.emoji}
                 {wsById.get(t.workspaceId)?.name}
