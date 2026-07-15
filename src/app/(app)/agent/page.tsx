@@ -76,9 +76,10 @@ export default function AgentPage() {
   };
 
   const openChat = async (id: string) => {
+    if (!user) return;
     setCurrentChatId(id);
     try {
-      setMessages(await loadChatMessages(id));
+      setMessages(await loadChatMessages(user.uid, id));
     } catch (e) {
       console.error("load chat failed", e);
       setMessages([]);
@@ -91,8 +92,9 @@ export default function AgentPage() {
   };
 
   const removeChat = async (id: string) => {
+    if (!user) return;
     try {
-      await deleteChat(id);
+      await deleteChat(user.uid, id);
     } catch (e) {
       console.error("delete chat failed", e);
     }
