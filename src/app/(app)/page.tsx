@@ -10,6 +10,7 @@ import { KanbanBoard } from "@/components/views/KanbanBoard";
 import { ListView } from "@/components/views/ListView";
 import { CalendarView } from "@/components/views/CalendarView";
 import { MindMapView } from "@/components/views/MindMapView";
+import { MemberBoard } from "@/components/views/MemberBoard";
 import { WhiteboardView } from "@/components/views/WhiteboardView";
 import { ProjectPages } from "@/components/pages/ProjectPages";
 import { TeamView } from "@/components/project/TeamView";
@@ -93,6 +94,8 @@ export default function ProjectViewPage() {
           <CalendarView onOpenTask={setSelected} />
         ) : tab === "map" ? (
           <MindMapView onOpenTask={setSelected} />
+        ) : tab === "members" ? (
+          <MemberBoard onOpenTask={setSelected} />
         ) : tab === "docs" ? (
           <ProjectPages project={currentProject} />
         ) : tab === "team" ? (
