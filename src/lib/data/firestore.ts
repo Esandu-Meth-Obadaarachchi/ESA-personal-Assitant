@@ -707,12 +707,16 @@ export async function touchChat(chatId: string, patch: { title?: string } = {}):
   await updateDoc(doc(requireDb(), "chats", chatId), { updatedAt: Date.now(), ...patch });
 }
 
-/** Delete a chat and all of its messages in one batch. */
-export async function deleteChat(chatId: string): Promise<void> {
+/** Delete a chat and all of its messages in one batch. Queries by memberIds (the
+ *  only rule-satisfying list filter) and narrows to the chat in JS — a chatId-only
+ *  query is rejected by the rules (rules are not filters). */
+export async function deleteChat(uid: string, chatId: string): Promise<void> {
   const database = requireDb();
-  const msgs = await getDocs(query(collection(database, "chatMessages"), where("chatId", "==", chatId)));
+  const msgs = await getDocs(
+    query(collection(database, "chatMessages"), where("memberIds", "array-contains", uid))
+  );
   const batch = writeBatch(database);
-  msgs.docs.forEach((d) => batch.delete(d.ref));
+  msgs.docs.filter((d) => d.get("chatId") === chatId).forEach((d) => batch.delete(d.ref));
   batch.delete(doc(database, "chats", chatId));
   await batch.commit();
 }
@@ -736,10 +740,15 @@ export async function addChatMessage(chatId: string, uid: string, msg: ChatMessa
   });
 }
 
-/** Load a chat's turns in order. Single-field query, sorted in JS. */
-export async function loadChatMessages(chatId: string): Promise<ChatMessage[]> {
-  const snap = await getDocs(query(collection(requireDb(), "chatMessages"), where("chatId", "==", chatId)));
+/** Load a chat's turns in order. Queries by memberIds (the only rule-satisfying
+ *  list filter), then narrows to this chat and sorts in JS. A chatId-only query is
+ *  rejected by the rules (rules are not filters), which is what left chats blank. */
+export async function loadChatMessages(uid: string, chatId: string): Promise<ChatMessage[]> {
+  const snap = await getDocs(
+    query(collection(requireDb(), "chatMessages"), where("memberIds", "array-contains", uid))
+  );
   return snap.docs
+    .filter((d) => d.get("chatId") === chatId)
     .map((d) => {
       const data = d.data() as {
         role: "user" | "assistant";
