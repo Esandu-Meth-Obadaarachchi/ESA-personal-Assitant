@@ -9,7 +9,15 @@ export async function loadWorkspace(uid: string, workspaceId: string) {
   if (!ws.memberIds.includes(uid)) throw new Response("Forbidden", { status: 403 });
 
   const projSnap = await adminDb().collection("projects").where("workspaceId", "==", workspaceId).get();
-  const projects = projSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Project, "id">) }));
+  // Enforce per-project scope, not just workspace membership. A member scoped to
+  // specific projects must never see another project's knowledge or tasks through
+  // the agent. project.memberIds is the denormalised access list (full-access
+  // members + members scoped to this project); a project without it is legacy and
+  // open to any workspace member. Full-access members keep every project, so
+  // cross-project questions still work.
+  const projects = projSnap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<Project, "id">) }))
+    .filter((p) => !p.memberIds || p.memberIds.includes(uid));
   return { ws, projects };
 }
 
