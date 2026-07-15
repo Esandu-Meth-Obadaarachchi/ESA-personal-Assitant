@@ -1,6 +1,8 @@
 # Deployment
 
-The app is hosted on **Netlify** as **Lune AI** at https://esa-ai-personal-assistant.netlify.app. Manual deploys for now — no CI/CD. Firebase (Auth + Firestore) is the backend and is deployed separately with the Firebase CLI.
+The app is hosted on **Netlify** as **Lune AI** at **https://luneai.site** (the `esa-ai-personal-assistant.netlify.app` subdomain still resolves). Manual deploys for now — no CI/CD. Firebase (Auth + Firestore) is the backend and is deployed separately with the Firebase CLI.
+
+> Deploy flow used in practice: work merges into `develop`, then `develop` merges into `main`, then `netlify deploy --build --prod`. Rules ship separately (below). After adding a collection, deploy the rules or it 403s.
 
 ## The two things that deploy separately
 
@@ -20,6 +22,7 @@ The app is hosted on **Netlify** as **Lune AI** at https://esa-ai-personal-assis
   - `GOOGLE_OAUTH_REDIRECT_URI = https://esa-ai-personal-assistant.netlify.app/api/calendar/callback`
   - `CALENDAR_WEBHOOK_URL = https://esa-ai-personal-assistant.netlify.app/api/calendar/webhook`
 - `NEXT_PUBLIC_*` values are inlined at build time, so env changes need a rebuild (`--build`) to take effect.
+- `CLAUDE_MODEL` sets the agent's generation model (default `claude-haiku-4-5`). Change it on the Netlify site and rebuild to move to Opus/Sonnet — no code change.
 
 To redeploy: `netlify deploy --build --prod` from the repo root.
 
