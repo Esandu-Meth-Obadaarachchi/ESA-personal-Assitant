@@ -21,6 +21,24 @@ export async function loadWorkspace(uid: string, workspaceId: string) {
   return { ws, projects };
 }
 
+/**
+ * Load everything a user can act on, across ALL their workspaces: every workspace
+ * and every project where their uid is in `memberIds`. This is the agent's scope —
+ * so "what are my tasks today" spans all workspaces, and knowledge search reaches
+ * every project the user belongs to. `memberIds` still gates everything (per-project
+ * scope is already baked into `project.memberIds`), so nothing they can't access
+ * ever loads.
+ */
+export async function loadUserScope(uid: string) {
+  const [wsSnap, projSnap] = await Promise.all([
+    adminDb().collection("workspaces").where("memberIds", "array-contains", uid).get(),
+    adminDb().collection("projects").where("memberIds", "array-contains", uid).get(),
+  ]);
+  const workspaces = wsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Workspace, "id">) }));
+  const projects = projSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Project, "id">) }));
+  return { workspaces, projects };
+}
+
 /** Load a single project, enforcing membership. */
 export async function loadProject(uid: string, projectId: string) {
   const doc = await adminDb().collection("projects").doc(projectId).get();
