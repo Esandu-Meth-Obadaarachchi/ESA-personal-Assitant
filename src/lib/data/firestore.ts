@@ -298,6 +298,7 @@ export interface NewTaskInput {
   createdBy: string;
   status?: Task["status"];
   priority?: Task["priority"];
+  notes?: string;
   dueDate?: string | null;
   dueTime?: string | null;
   dueEndTime?: string | null;
@@ -312,7 +313,7 @@ export async function createTask(input: NewTaskInput): Promise<string> {
     projectId: input.projectId,
     parentId: input.parentId ?? null,
     title: input.title,
-    notes: "",
+    notes: input.notes ?? "",
     status: input.status ?? "todo",
     priority: input.priority ?? "med",
     assignees: input.assignee
