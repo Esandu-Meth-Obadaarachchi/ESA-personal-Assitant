@@ -1,6 +1,6 @@
 # Data model
 
-Flat top-level Firestore collections (not deeply nested) so security rules and `array-contains` isolation queries stay simple. Every user-facing doc carries `memberIds` for isolation: `workspaces`, `projects`, `tasks`, `pages`, `whiteboards`, `dayPlans`. `invites` is server-only. Two more (`calendarConnections`, `calendarOAuthStates`) are server-only and never in the rules.
+Flat top-level Firestore collections (not deeply nested) so security rules and `array-contains` isolation queries stay simple. Every user-facing doc carries `memberIds` for isolation: `workspaces`, `projects`, `tasks`, `pages`, `whiteboards`, `dayPlans`, `chats`, `chatMessages`. `invites` is server-only. Two more (`calendarConnections`, `calendarOAuthStates`) are server-only and never in the rules.
 
 ## Collections
 
@@ -26,14 +26,18 @@ archived: boolean
 isInbox: boolean            # the per-workspace catch-all for project-less tasks
 createdAt: number
 memberIds: string[]         # denormalised from the workspace for rules
+tags: string[]              # the project's tag palette (optional)
+team: ProjectMember[]       # per-project member roles/skills for AI assignment: { uid, name, role, skills[], notes }
+customStatuses: CustomStatus[] # extra status columns on top of the built-ins: { id, label, color(hex) }
 ```
+`team` and `customStatuses` are optional and admin-managed from the Team and Board tabs. See `docs/COLLABORATION.md`.
 
 ### `tasks/{id}`
 ```
 workspaceId, projectId: string
 parentId: string | null     # null = top-level; else recursive subtask
 title, notes: string
-status: "todo" | "in_progress" | "blocked" | "done"
+status: string              # "todo" | "in_progress" | "blocked" | "done", or a project custom-status id. Only "done" counts as complete
 priority: "low" | "med" | "high" | "urgent"
 assigneeId, assigneeName, assigneeAvatar
 dueDate, startDate: string | null   # yyyy-mm-dd
@@ -80,6 +84,29 @@ updatedAt: number
 memberIds: string[]         # always [uid]
 ```
 
+### `chats/{id}`  (saved agent conversations, personal to one user)
+```
+uid: string
+workspaceId: string
+title: string               # taken from the first message
+createdAt, updatedAt: number
+memberIds: string[]         # always [uid]
+```
+
+### `chatMessages/{id}`  (turns within a chat)
+```
+chatId: string
+uid: string
+role: "user" | "assistant"
+content: string
+steps: string[]             # tool-call trace (assistant turns)
+sources: RetrievedChunk[]   # retrieved knowledge (assistant turns)
+cardsJson: string           # serialised AgentCard[] (JSON; Firestore rejects nested arrays as native fields)
+createdAt: number
+memberIds: string[]         # always [uid]
+```
+Loaded/deleted by `memberIds array-contains uid` then narrowed to `chatId` in JS — a `chatId`-only query is rejected by the rules ("rules are not filters"), which is what once left opened chats blank.
+
 ### `invites/{id}`  (server-only, `allow read,write: if false`)
 ```
 workspaceId, workspaceName, workspaceEmoji: string
@@ -108,8 +135,9 @@ Sibling ordering inside each group (Tree and List) is: done tasks sink to the bo
 
 Every query is single-field equality or `array-contains` and sorted/filtered client-side, so **no composite indexes are needed** (`firestore.indexes.json` is empty by design). This includes the sharing queries on the server: `invites where workspaceId == x` (or `where email == y`) then filter `status`/`email` in memory — deliberately not multi-`where`, to avoid ever needing a composite index.
 
-- `workspaces / projects / pages where memberIds array-contains uid` (then filter by workspace client-side)
+- `workspaces / projects / pages / chats where memberIds array-contains uid` (then filter by workspace client-side)
 - `tasks where memberIds array-contains uid` (then filter by project/workspace)
+- `chatMessages where memberIds array-contains uid` (then filter by `chatId`)
 - `pages/{id}`, `whiteboards/{projectId}`, `dayPlans/{uid}_{date}` — direct doc reads
 
 ## Real-time

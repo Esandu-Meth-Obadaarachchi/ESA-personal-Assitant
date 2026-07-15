@@ -5,9 +5,9 @@
 Claude has no embedding model, so retrieval and generation are split:
 
 - **Embeddings: Voyage `voyage-3.5`** (1024-dim) — Anthropic's recommended embedding partner. Used for both document chunks (`input_type: document`) and queries (`input_type: query`).
-- **Generation + agent: Claude `claude-opus-4-8`** — the tool-calling brain.
+- **Generation + agent: Claude, model set by the `CLAUDE_MODEL` env var (default `claude-haiku-4-5`)** — the tool-calling brain. Swap to `claude-opus-4-8` or `claude-sonnet-5` for higher answer quality at higher cost. The agentic-retrieval helper steps (rewrite / grade / groundedness) always run on Haiku (`CLAUDE_FAST_MODEL`) regardless.
 
-The Pinecone index must be **dimension 1024, cosine** to match Voyage.
+The Pinecone index must be **dimension 1024, cosine** to match Voyage. Retrieval is upgraded to an agentic loop (rewrite -> rerank -> grade-and-retry -> grounded self-check) — see `docs/AGENTIC_RAG.md`.
 
 ## Pipeline
 
@@ -20,14 +20,14 @@ Retrieve (search_knowledge tool / /api/related)
   query -> Voyage embedQuery -> Pinecone query in namespace(s) -> top-k chunks
 ```
 
-Each project owns a Pinecone **namespace** (`project.ragNamespace`), so knowledge is isolated per project. Cross-project search merges results from every namespace in the workspace by score (`queryNamespaces`).
+Each project owns a Pinecone **namespace** (`project.ragNamespace`), so knowledge is isolated per project. Cross-project search merges results from every namespace **the user can access** by score (`queryNamespaces`). `loadWorkspace` filters projects by per-project scope, so a scoped member can never retrieve another project's knowledge through the agent.
 
 ## The agent loop (`src/lib/ai/agent.ts`)
 
-A manual Claude tool-use loop (up to 6 round-trips):
+A manual Claude tool-use loop, bounded by `MAX_TOOL_ROUNDS` (4) round-trips and `MAX_ANSWER_TOKENS` (1024) of output, sent only the last 5 conversation turns to keep cost down:
 
 1. `messages.create` with the persona system prompt + tool schemas.
-2. If `stop_reason !== "tool_use"`, collect the text answer and return.
+2. If `stop_reason !== "tool_use"`, collect the text answer, run the grounded self-check, and return.
 3. Otherwise execute each `tool_use` block, push `tool_result`s, loop.
 
 Thinking is left off for snappy replies; the persona (`persona.ts`) instructs Claude to reply with final answers only, so reasoning does not leak into the visible message. Reasoning is instead surfaced as collapsible **steps** (the list of tool calls).

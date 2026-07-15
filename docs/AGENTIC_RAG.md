@@ -7,20 +7,22 @@ This is the retrieval upgrade layered on top of the RAG described in `RAG.md`. T
 ```
 question
   -> rewrite      (Haiku turns it into a search-optimised query)
-  -> retrieve     (Voyage embed + Pinecone across allowed project namespaces, wide net of 20)
-  -> rerank       (Voyage rerank-2.5 cross-encoder, keep the best 5)
+  -> retrieve     (Voyage embed + Pinecone across the user's allowed project namespaces, wide net of 20)
+  -> rerank       (Voyage rerank-2.5 cross-encoder, keep the best 4)
   -> grade        (Haiku: do these chunks answer the question? good | weak)
-        weak and attempts < 3 -> rewrite from a new angle and retry
-  -> generate     (the Opus agent writes the answer, in agent.ts)
+        weak and attempts < 2 -> rewrite from a new angle and retry
+  -> generate     (the agent writes the answer in agent.ts, on CLAUDE_MODEL)
   -> self-check    (Haiku: is every claim supported by the sources?)
 ```
+
+The "allowed project namespaces" are only the projects the requesting user belongs to. `loadWorkspace` (`src/lib/ai/server.ts`) filters by per-project scope before the agent runs, so a scoped member cannot retrieve another project's knowledge.
 
 ### Why each step
 
 - Rewrite. A user question is not a good search query. Haiku turns it into keywords and key entities. On a retry it is told the previous query was weak, so it comes at the topic from a different angle.
 - Retrieve (bi-encoder). Voyage embeddings plus Pinecone cast a wide net fast. This is recall: get the right chunk somewhere in the top 20.
 - Rerank (cross-encoder). `rerank-2.5` reads each (query, chunk) pair together and scores true relevance, so the best chunks rise to the top 5. This is precision, and it is the single biggest accuracy lever after chunking.
-- Grade and retry. Haiku judges whether the chunks actually answer the question. A weak verdict reformulates the query and searches again, up to three attempts, then stops honestly instead of forcing a bad answer.
+- Grade and retry. Haiku judges whether the chunks actually answer the question. A weak verdict reformulates the query and searches again, up to two attempts, then stops honestly instead of forcing a bad answer.
 - Grounded self-check. After the agent writes its answer, Haiku verifies every claim traces to a retrieved source. An unsupported answer gets a subtle caveat rather than being presented as fact.
 
 ## Where it lives
@@ -37,10 +39,10 @@ question
 ## Models and cost
 
 - Voyage `voyage-3.5` for embeddings and `rerank-2.5` for reranking (same vendor, same account).
-- Claude Haiku 4.5 for the cheap steps: rewrite, grade, and the groundedness check. Short calls, a fraction of Opus cost.
-- Claude Opus 4.8 stays the agent's generation model, unchanged.
+- Claude Haiku 4.5 (`CLAUDE_FAST_MODEL`) for the cheap steps: rewrite, grade, and the groundedness check. Short calls, always Haiku regardless of the generation model.
+- The agent's generation model is `CLAUDE_MODEL` (default `claude-haiku-4-5`; set it to `claude-opus-4-8`/`claude-sonnet-5` for higher quality). Generation is also cost-capped in `agent.ts`: `MAX_ANSWER_TOKENS` 1024, `MAX_TOOL_ROUNDS` 4, and only the last 5 turns are sent.
 
-So a single knowledge question adds a handful of small Haiku calls plus one Voyage rerank call on top of the existing embed and Pinecone query. The heavy generation call is unchanged.
+So a single knowledge question adds a handful of small Haiku calls plus one Voyage rerank call on top of the existing embed and Pinecone query.
 
 ## LangSmith tracing
 
@@ -59,8 +61,8 @@ With it on, every model call in the agent and the retrieval loop shows up as a t
 In `src/lib/ai/retrieval.ts`:
 
 - `CANDIDATES` (20) — the wide net from the bi-encoder. Raise for more recall at more rerank cost.
-- `KEEP` (5) — chunks kept after reranking and fed to the model. Fewer keeps the prompt tight.
-- `MAX_ATTEMPTS` (3) — the grade-and-retry ceiling. Bounds latency and cost.
+- `KEEP` (4) — chunks kept after reranking and fed to the model. Fewer keeps the prompt tight.
+- `MAX_ATTEMPTS` (2) — the grade-and-retry ceiling. Bounds latency and cost.
 
 ## What was deliberately left out
 
