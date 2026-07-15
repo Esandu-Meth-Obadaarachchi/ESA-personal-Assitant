@@ -522,9 +522,10 @@ function isoOffset(days: number): string {
 }
 
 /**
- * Seed a brand-new user with three workspaces so the workspace switcher and the
- * standup have something real to show. Runs once (guarded by an empty-workspace
- * check upstream). Everything is written in a single batch.
+ * Seed a brand-new user with a single sandbox workspace ("Test it out") holding
+ * two demo projects, so the switcher, board and standup have something to show
+ * without cluttering the account. Runs once (guarded by an empty-workspace check
+ * upstream). Everything is written in a single batch.
  */
 export async function seedNewUser(user: User): Promise<string> {
   const database = requireDb();
@@ -601,44 +602,28 @@ export async function seedNewUser(user: User): Promise<string> {
     return ref;
   };
 
-  // --- Office ---
-  const office = ws("Office", "💼", now);
-  const officeInbox = proj(office, "Inbox", "Loose tasks not tied to a project", "#6b7280", "Office", true);
-  task(office, officeInbox, "Reply to the BMPC organisers", { priority: "med", dueDate: isoOffset(1) });
-  const solar = proj(office, "SLT Solar Dashboard", "Unified monitoring for 19+ solar sites", "#f5c518", "Office");
-  const report = task(office, solar, "Ship the monthly performance report", {
-    status: "in_progress",
-    priority: "high",
-    dueDate: isoOffset(1),
-    tags: ["report", "recurring"],
-  });
-  task(office, solar, "Pull kWh/kWp comparison per site", { parentRef: report, status: "done", priority: "med" });
-  task(office, solar, "Draft executive summary", { parentRef: report, status: "in_progress", priority: "high", dueDate: isoOffset(0) });
-  task(office, solar, "Get sign-off from operations", { parentRef: report, status: "todo", priority: "med", dueDate: isoOffset(2) });
-  task(office, solar, "Fix Excel upload timeout on large files", { status: "blocked", priority: "urgent", dueDate: isoOffset(-1), tags: ["bug", "backend"] });
-  task(office, solar, "Add site comparison chart (Recharts)", { status: "todo", priority: "med", dueDate: isoOffset(4), tags: ["frontend"] });
-  const powerzenith = proj(office, "PowerZenith", "Real-time energy monitoring + anomaly detection", "#60a5fa", "Office");
-  task(office, powerzenith, "Retrain anomaly model on Q2 data", { status: "todo", priority: "high", dueDate: isoOffset(6), tags: ["ml"] });
-  task(office, powerzenith, "Wire InfluxDB alerts to dashboard", { status: "todo", priority: "med", dueDate: isoOffset(-2) });
+  // --- Test it out (single sandbox workspace) ---
+  const sandbox = ws("Test it out workspace", "🧪", now);
+  proj(sandbox, "Inbox", "Loose tasks not tied to a project", "#6b7280", "Test it out workspace", true);
 
-  // --- Freelance ---
-  const freelance = ws("Freelance", "🚀", now + 1);
-  proj(freelance, "Inbox", "Loose tasks not tied to a project", "#6b7280", "Freelance", true);
-  const gradify = proj(freelance, "Gradify", "Question bank, mock exams, AI marking", "#4ade80", "Freelance");
-  const foundation = task(freelance, gradify, "Foundation phase build", { status: "in_progress", priority: "high", dueDate: isoOffset(3), tags: ["milestone"] });
-  task(freelance, gradify, "Auth + roles (teacher/student)", { parentRef: foundation, status: "todo", priority: "high" });
-  task(freelance, gradify, "Question bank schema", { parentRef: foundation, status: "todo", priority: "med" });
-  task(freelance, gradify, "Define AI marking rubric prompt", { status: "todo", priority: "med", dueDate: isoOffset(5), tags: ["ai"] });
+  // Project 1 — a guided tour of the features.
+  const gettingStarted = proj(sandbox, "Getting started", "A quick tour — delete this whenever you like", "#f5c518", "Test it out workspace");
+  task(sandbox, gettingStarted, "Create your first task", { status: "todo", priority: "high", dueDate: isoOffset(0), tags: ["start-here"] });
+  task(sandbox, gettingStarted, "Try the Board, Members and Calendar views", { status: "todo", priority: "med" });
+  task(sandbox, gettingStarted, "Upload a document in Knowledge", { status: "todo", priority: "med", dueDate: isoOffset(2), tags: ["start-here"] });
+  task(sandbox, gettingStarted, "Ask the brain a question", { status: "in_progress", priority: "med" });
 
-  // --- LeadX ---
-  const leadx = ws("LeadX", "⚡", now + 2);
-  proj(leadx, "Inbox", "Loose tasks not tied to a project", "#6b7280", "LeadX", true);
-  const pipeline = proj(leadx, "Pipeline", "Lead generation and outreach", "#f472b6", "LeadX");
-  task(leadx, pipeline, "Follow up on Predictiv AI conversation", { status: "todo", priority: "high", dueDate: isoOffset(0) });
-  task(leadx, pipeline, "Prep Cresco agri-tech application", { status: "todo", priority: "med", dueDate: isoOffset(7) });
+  // Project 2 — a realistic little task tree so the views have shape.
+  const demo = proj(sandbox, "Demo project", "Sample tasks so the board has something to show", "#60a5fa", "Test it out workspace");
+  const launch = task(sandbox, demo, "Plan the launch", { status: "in_progress", priority: "high", dueDate: isoOffset(3), tags: ["milestone"] });
+  task(sandbox, demo, "Write the brief", { parentRef: launch, status: "done", priority: "med" });
+  task(sandbox, demo, "Design the landing page", { parentRef: launch, status: "in_progress", priority: "high", dueDate: isoOffset(0) });
+  task(sandbox, demo, "Set up analytics", { parentRef: launch, status: "todo", priority: "med", dueDate: isoOffset(4) });
+  task(sandbox, demo, "Fix the sign-up bug", { status: "blocked", priority: "urgent", dueDate: isoOffset(-1), tags: ["bug"] });
+  task(sandbox, demo, "Draft the release notes", { status: "todo", priority: "low", dueDate: isoOffset(5), tags: ["docs"] });
 
   await batch.commit();
-  return office.id;
+  return sandbox.id;
 }
 
 /* ------------------------------ presence ------------------------------ */
