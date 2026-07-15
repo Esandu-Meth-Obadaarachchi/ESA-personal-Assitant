@@ -54,6 +54,23 @@ export interface Workspace {
   createdAt: number;
 }
 
+/**
+ * A member's working profile on a specific project. Set by an admin/owner on the
+ * project's Team tab and used by the AI to assign work. Lives on the project (not
+ * the workspace) because the same person can be, say, backend on one project and
+ * full stack on another. `uid` must be one of the project's members.
+ */
+export interface ProjectMember {
+  uid: string;
+  name: string;
+  /** e.g. "Backend", "DevOps", "Full stack". Free text; presets in constants.ts. */
+  role?: string;
+  /** Tech stack / skills, e.g. ["Node", "PostgreSQL", "Docker"]. */
+  skills?: string[];
+  /** Anything else the AI should weigh — availability, focus, seniority. */
+  notes?: string;
+}
+
 export interface Project {
   id: string;
   workspaceId: string;
@@ -70,6 +87,8 @@ export interface Project {
   memberIds?: string[];
   /** The project's custom tag palette — the labels its tasks can be tagged with. */
   tags?: string[];
+  /** Per-project member roles/skills, used by AI task assignment. Admin-managed. */
+  team?: ProjectMember[];
 }
 
 export interface LinkedDoc {
