@@ -41,6 +41,15 @@ export default function AgentPage() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Grow the composer with the text, up to a cap, then let it scroll.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [input]);
 
   useEffect(() => {
     if (!user) return;
@@ -221,6 +230,7 @@ export default function AgentPage() {
             </div>
             <div className="flex items-end gap-2 rounded-xl border border-border bg-surface-2 p-1.5 focus-within:border-accent/50">
               <textarea
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -232,7 +242,7 @@ export default function AgentPage() {
                 rows={1}
                 maxLength={MAX_CHAT_INPUT_CHARS}
                 placeholder="Ask the brain anything…"
-                className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[13.5px] text-text outline-none placeholder:text-text-faint"
+                className="max-h-60 min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-[13.5px] leading-relaxed text-text outline-none placeholder:text-text-faint"
               />
               <button
                 onClick={() => send(input)}
