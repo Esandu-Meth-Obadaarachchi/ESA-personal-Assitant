@@ -2,6 +2,13 @@
 
 Notable changes, newest first. Product name: **Lune AI**.
 
+## 2026-07-15 — Cross-workspace agent + global chat history
+
+### Changed
+- **The agent now spans every workspace.** `/api/chat` loads `loadUserScope` (all workspaces + projects the user can access, gated by `memberIds`) instead of a single workspace. So "what are my tasks today / assigned to me" returns tasks from every workspace, and knowledge search reaches every accessible project's docs. The current `workspaceId`/`projectId` are now only the default for new tasks and the prompt's naming. Per-project isolation is unchanged — a scoped member still only sees their projects.
+- **Chat history is global.** `watchChats(uid)` no longer filters by workspace, and the Agent page no longer resets the conversation when you switch workspace. Any past chat opens from any workspace.
+- `create_task` writes into the target project's own workspace and `memberIds` (the agent can create in any accessible project, not only the current workspace).
+
 ## 2026-07-15 — Team, statuses, cheaper agent
 
 Shipped to `main` and deployed to https://luneai.site.

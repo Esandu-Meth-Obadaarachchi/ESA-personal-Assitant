@@ -104,13 +104,13 @@ firestore.rules / firestore.indexes.json / firebase.json / netlify.toml
 
 ## How the agent works (important)
 
-`POST /api/chat` -> `requireUser` verifies the Firebase ID token -> `loadWorkspace` fetches the workspace + **the projects this user can access** (workspace membership *and* per-project scope enforced — a scoped member never sees another project's tasks or knowledge through the agent) -> `runAgent` runs a Claude tool-use loop (`src/lib/ai/agent.ts`) with the tools in `src/lib/ai/tools.ts`:
+`POST /api/chat` -> `requireUser` verifies the Firebase ID token -> `loadUserScope` fetches **every workspace and project the user can access, across all their workspaces** (each gated by `memberIds`, so per-project scope still holds — a scoped member never sees another project's tasks or knowledge) -> `runAgent` runs a Claude tool-use loop (`src/lib/ai/agent.ts`) with the tools in `src/lib/ai/tools.ts`:
 
-- `search_knowledge` — Voyage-embed the query, agentic retrieve + rerank across the allowed project namespace(s)
-- `list_tasks`, `create_task`, `update_task` — read/write Firestore via admin
+- `search_knowledge` — Voyage-embed the query, agentic retrieve + rerank across every accessible project namespace (all workspaces)
+- `list_tasks`, `create_task`, `update_task` — read/write Firestore via admin; `list_tasks` spans all the user's workspaces, so "my tasks today" is global. `create_task` writes into the target project's own workspace + `memberIds`
 - `summarize_project` — tasks + top knowledge chunks
 
-Cost caps live in `agent.ts` (`MAX_ANSWER_TOKENS` 1024, `MAX_TOOL_ROUNDS` 4) and only the last 5 turns are sent to the model; the full conversation is persisted in Firestore (`chats` + `chatMessages`, personal to the user). Tool executors accumulate `sources`, `cards` and `steps` on the `ToolContext`; these are returned to the UI and rendered by `components/agent/cards.tsx`. Thinking is left off for latency; the persona prompt (`src/lib/ai/persona.ts`) keeps reasoning out of the visible answer. Retrieval quality (rewrite -> rerank -> grade-and-retry -> grounded self-check) is in `src/lib/ai/retrieval.ts` — see `docs/AGENTIC_RAG.md`.
+The request's `workspaceId`/`projectId` are only the current view — used to default new tasks and name the current workspace in the prompt, not to limit scope. Cost caps live in `agent.ts` (`MAX_ANSWER_TOKENS` 1024, `MAX_TOOL_ROUNDS` 4) and only the last 5 turns are sent to the model; the full conversation is persisted in Firestore (`chats` + `chatMessages`, personal to the user and **global across workspaces** — the sidebar shows every past chat regardless of which workspace is active). Tool executors accumulate `sources`, `cards` and `steps` on the `ToolContext`; these are returned to the UI and rendered by `components/agent/cards.tsx`. Thinking is left off for latency; the persona prompt (`src/lib/ai/persona.ts`) keeps reasoning out of the visible answer. Retrieval quality (rewrite -> rerank -> grade-and-retry -> grounded self-check) is in `src/lib/ai/retrieval.ts` — see `docs/AGENTIC_RAG.md`.
 
 The generation model is `CLAUDE_MODEL` (default `claude-haiku-4-5`); the retrieval helper steps always run on Haiku. When you change the API/agent surface, read the `claude-api` skill for current model IDs and SDK shapes — do not guess.
 
