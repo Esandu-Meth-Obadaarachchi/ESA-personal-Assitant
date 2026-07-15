@@ -16,7 +16,7 @@ import {
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase/client";
-import { PROJECT_COLORS } from "@/lib/constants";
+import { PROJECT_COLORS, slugStatus } from "@/lib/constants";
 import type {
   AgentCard,
   Chat,
@@ -168,6 +168,26 @@ export function fullAccessUids(workspace: Workspace): string[] {
 
 export async function updateProject(id: string, patch: Partial<Project>) {
   await updateDoc(doc(requireDb(), "projects", id), patch);
+}
+
+/** Add a custom status column to a project (built-ins stay; this appends). */
+export async function addCustomStatus(project: Project, label: string, color: string) {
+  const existing = project.customStatuses ?? [];
+  const id = slugStatus(label, existing);
+  const next = [...existing, { id, label: label.trim(), color }];
+  await updateDoc(doc(requireDb(), "projects", project.id), { customStatuses: next });
+}
+
+/** Remove a custom status. Any task still in it is moved back to To Do so no task
+ *  is left stranded in a column that no longer exists. Built-ins are never passed. */
+export async function deleteCustomStatus(project: Project, statusId: string, tasks: Task[]) {
+  const database = requireDb();
+  const stranded = tasks.filter((t) => t.projectId === project.id && t.status === statusId);
+  const next = (project.customStatuses ?? []).filter((c) => c.id !== statusId);
+  const batch = writeBatch(database);
+  stranded.forEach((t) => batch.update(doc(database, "tasks", t.id), { status: "todo", updatedAt: Date.now() }));
+  batch.update(doc(database, "projects", project.id), { customStatuses: next });
+  await batch.commit();
 }
 
 /** Add a label to a project's tag palette (the set every task can pick from). */

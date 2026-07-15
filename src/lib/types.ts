@@ -8,8 +8,23 @@
  * can pull context from its project's knowledge base.
  */
 
-export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
+/**
+ * The four built-in statuses are always present. A project may add its own on top
+ * (e.g. "to-be-reviewed"), so the stored value is any string — the `(string & {})`
+ * keeps autocomplete for the built-ins while allowing custom ids. Only "done" ever
+ * counts as complete (overdue / standup / done-lines all key off it).
+ */
+export type TaskStatus = "todo" | "in_progress" | "blocked" | "done" | (string & {});
 export type TaskPriority = "low" | "med" | "high" | "urgent";
+
+/** A project-defined status column added on top of the four built-ins. */
+export interface CustomStatus {
+  /** Stable slug used as Task.status, e.g. "to-be-reviewed". */
+  id: string;
+  label: string;
+  /** Raw hex, e.g. "#22d3ee" — custom statuses are not tied to a Tailwind token. */
+  color: string;
+}
 export type MemberRole = "owner" | "admin" | "member" | "client-viewer";
 
 export interface WorkspaceMember {
@@ -89,6 +104,8 @@ export interface Project {
   tags?: string[];
   /** Per-project member roles/skills, used by AI task assignment. Admin-managed. */
   team?: ProjectMember[];
+  /** Extra status columns beyond the four built-ins (To Do / In Progress / Blocked / Done). */
+  customStatuses?: CustomStatus[];
 }
 
 export interface LinkedDoc {
