@@ -1,8 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { wrapAnthropic } from "langsmith/wrappers/anthropic";
 
-/** The agent + RAG generation model. Opus 4.8 — Anthropic's most capable Opus tier. */
-export const CLAUDE_MODEL = "claude-opus-4-8";
+/**
+ * The agent + RAG generation model. Set via the CLAUDE_MODEL env var so it can be
+ * swapped without a code change; defaults to Haiku 4.5 — the cheapest tier
+ * ($1/$5 per 1M). Point CLAUDE_MODEL at claude-opus-4-8 or claude-sonnet-5 for
+ * higher answer quality at higher cost.
+ */
+export const CLAUDE_MODEL = process.env.CLAUDE_MODEL?.trim() || "claude-haiku-4-5";
 
 /**
  * The cheap, fast model for the agentic-retrieval helper calls — query rewrite,
