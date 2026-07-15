@@ -68,6 +68,20 @@ service cloud.firestore {
       allow update, delete: if isMember(resource.data);
     }
 
+    // Saved agent conversations, personal to one user (memberIds = [uid]).
+    match /chats/{id} {
+      allow read: if isMember(resource.data);
+      allow create: if isMember(request.resource.data);
+      allow update, delete: if isMember(resource.data);
+    }
+
+    // Individual turns within a chat. Same per-user isolation as the chat.
+    match /chatMessages/{id} {
+      allow read: if isMember(resource.data);
+      allow create: if isMember(request.resource.data);
+      allow update, delete: if isMember(resource.data);
+    }
+
     // Share invitations are managed entirely server-side by the Admin SDK
     // (which bypasses rules), so clients get no direct access.
     match /invites/{id} {

@@ -119,5 +119,11 @@ function Row({ node }: { node: TaskNode }) {
 }
 
 function statusColor(s: Task["status"]): string {
-  return { todo: "#9aa0ab", in_progress: "#2563eb", blocked: "#dc2626", done: "#16a34a" }[s];
+  const map: Record<string, string> = {
+    todo: "#9aa0ab",
+    in_progress: "#2563eb",
+    blocked: "#dc2626",
+    done: "#16a34a",
+  };
+  return map[s] ?? "#6b7280";
 }

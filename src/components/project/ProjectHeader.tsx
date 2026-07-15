@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { BookText, CalendarDays, Clock, Download, FileText, KanbanSquare, ListTree, Network, PencilRuler, Rows3, Sparkles } from "lucide-react";
+import { BookText, CalendarDays, Clock, Download, FileText, KanbanSquare, ListTree, Network, PencilRuler, Rows3, Sparkles, Users, UsersRound } from "lucide-react";
 import type { Project, Task } from "@/lib/types";
 import { dueState } from "@/lib/date";
 import { exportTimeCSV } from "@/lib/export";
@@ -11,7 +11,7 @@ import { Dropdown, MenuItem } from "@/components/ui/Dropdown";
 import { PrintView } from "./PrintView";
 import { cn } from "@/lib/utils";
 
-export type ViewTab = "tree" | "board" | "list" | "calendar" | "map" | "draw" | "docs";
+export type ViewTab = "tree" | "board" | "list" | "calendar" | "map" | "draw" | "docs" | "members" | "team";
 
 const TABS: { id: ViewTab; label: string; icon: typeof ListTree }[] = [
   { id: "tree", label: "Tree", icon: ListTree },
@@ -21,6 +21,8 @@ const TABS: { id: ViewTab; label: string; icon: typeof ListTree }[] = [
   { id: "map", label: "Map", icon: Network },
   { id: "draw", label: "Draw", icon: PencilRuler },
   { id: "docs", label: "Docs", icon: BookText },
+  { id: "members", label: "Members", icon: UsersRound },
+  { id: "team", label: "Team", icon: Users },
 ];
 
 export function ProjectHeader({

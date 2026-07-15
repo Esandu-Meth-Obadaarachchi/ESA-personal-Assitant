@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/firebase/admin";
 import { loadProject } from "@/lib/ai/server";
-import { embedQuery } from "@/lib/ai/voyage";
-import { queryNamespace } from "@/lib/ai/pinecone";
+import { retrieveAndRerank } from "@/lib/ai/retrieval";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,8 +21,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "projectId and query are required" }, { status: 400 });
     }
     const project = await loadProject(user.uid, projectId);
-    const vector = await embedQuery(query);
-    const chunks = await queryNamespace(project.ragNamespace, vector, 3);
+    const chunks = await retrieveAndRerank([project.ragNamespace], query, 3);
     return NextResponse.json({ chunks });
   } catch (err) {
     if (err instanceof Response) return err;

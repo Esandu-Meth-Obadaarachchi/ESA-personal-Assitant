@@ -8,8 +8,23 @@
  * can pull context from its project's knowledge base.
  */
 
-export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
+/**
+ * The four built-in statuses are always present. A project may add its own on top
+ * (e.g. "to-be-reviewed"), so the stored value is any string — the `(string & {})`
+ * keeps autocomplete for the built-ins while allowing custom ids. Only "done" ever
+ * counts as complete (overdue / standup / done-lines all key off it).
+ */
+export type TaskStatus = "todo" | "in_progress" | "blocked" | "done" | (string & {});
 export type TaskPriority = "low" | "med" | "high" | "urgent";
+
+/** A project-defined status column added on top of the four built-ins. */
+export interface CustomStatus {
+  /** Stable slug used as Task.status, e.g. "to-be-reviewed". */
+  id: string;
+  label: string;
+  /** Raw hex, e.g. "#22d3ee" — custom statuses are not tied to a Tailwind token. */
+  color: string;
+}
 export type MemberRole = "owner" | "admin" | "member" | "client-viewer";
 
 export interface WorkspaceMember {
@@ -54,6 +69,23 @@ export interface Workspace {
   createdAt: number;
 }
 
+/**
+ * A member's working profile on a specific project. Set by an admin/owner on the
+ * project's Team tab and used by the AI to assign work. Lives on the project (not
+ * the workspace) because the same person can be, say, backend on one project and
+ * full stack on another. `uid` must be one of the project's members.
+ */
+export interface ProjectMember {
+  uid: string;
+  name: string;
+  /** e.g. "Backend", "DevOps", "Full stack". Free text; presets in constants.ts. */
+  role?: string;
+  /** Tech stack / skills, e.g. ["Node", "PostgreSQL", "Docker"]. */
+  skills?: string[];
+  /** Anything else the AI should weigh — availability, focus, seniority. */
+  notes?: string;
+}
+
 export interface Project {
   id: string;
   workspaceId: string;
@@ -70,6 +102,10 @@ export interface Project {
   memberIds?: string[];
   /** The project's custom tag palette — the labels its tasks can be tagged with. */
   tags?: string[];
+  /** Per-project member roles/skills, used by AI task assignment. Admin-managed. */
+  team?: ProjectMember[];
+  /** Extra status columns beyond the four built-ins (To Do / In Progress / Blocked / Done). */
+  customStatuses?: CustomStatus[];
 }
 
 export interface LinkedDoc {
@@ -246,6 +282,21 @@ export interface ChatMessage {
   cards?: AgentCard[];
   createdAt: number;
   pending?: boolean;
+}
+
+/**
+ * A saved agent conversation. Personal to one user (`memberIds` is always the
+ * single owner uid) and scoped to a workspace. The turns live in the
+ * `chatMessages` collection, keyed by `chatId`.
+ */
+export interface Chat {
+  id: string;
+  uid: string;
+  workspaceId: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  memberIds: string[];
 }
 
 export interface StandupDigest {

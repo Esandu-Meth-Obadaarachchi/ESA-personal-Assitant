@@ -16,8 +16,21 @@ import {
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase/client";
-import { PROJECT_COLORS } from "@/lib/constants";
-import type { DayPlan, Page, Presence, Project, Task, Whiteboard, Workspace, WorkspaceMember } from "@/lib/types";
+import { PROJECT_COLORS, slugStatus } from "@/lib/constants";
+import type {
+  AgentCard,
+  Chat,
+  ChatMessage,
+  DayPlan,
+  Page,
+  Presence,
+  Project,
+  RetrievedChunk,
+  Task,
+  Whiteboard,
+  Workspace,
+  WorkspaceMember,
+} from "@/lib/types";
 import { slugifyNamespace } from "./tree";
 
 /**
@@ -157,6 +170,26 @@ export async function updateProject(id: string, patch: Partial<Project>) {
   await updateDoc(doc(requireDb(), "projects", id), patch);
 }
 
+/** Add a custom status column to a project (built-ins stay; this appends). */
+export async function addCustomStatus(project: Project, label: string, color: string) {
+  const existing = project.customStatuses ?? [];
+  const id = slugStatus(label, existing);
+  const next = [...existing, { id, label: label.trim(), color }];
+  await updateDoc(doc(requireDb(), "projects", project.id), { customStatuses: next });
+}
+
+/** Remove a custom status. Any task still in it is moved back to To Do so no task
+ *  is left stranded in a column that no longer exists. Built-ins are never passed. */
+export async function deleteCustomStatus(project: Project, statusId: string, tasks: Task[]) {
+  const database = requireDb();
+  const stranded = tasks.filter((t) => t.projectId === project.id && t.status === statusId);
+  const next = (project.customStatuses ?? []).filter((c) => c.id !== statusId);
+  const batch = writeBatch(database);
+  stranded.forEach((t) => batch.update(doc(database, "tasks", t.id), { status: "todo", updatedAt: Date.now() }));
+  batch.update(doc(database, "projects", project.id), { customStatuses: next });
+  await batch.commit();
+}
+
 /** Add a label to a project's tag palette (the set every task can pick from). */
 export async function addProjectTag(id: string, tag: string) {
   await updateDoc(doc(requireDb(), "projects", id), { tags: arrayUnion(tag) });
@@ -285,6 +318,7 @@ export interface NewTaskInput {
   createdBy: string;
   status?: Task["status"];
   priority?: Task["priority"];
+  notes?: string;
   dueDate?: string | null;
   dueTime?: string | null;
   dueEndTime?: string | null;
@@ -299,7 +333,7 @@ export async function createTask(input: NewTaskInput): Promise<string> {
     projectId: input.projectId,
     parentId: input.parentId ?? null,
     title: input.title,
-    notes: "",
+    notes: input.notes ?? "",
     status: input.status ?? "todo",
     priority: input.priority ?? "med",
     assignees: input.assignee
@@ -488,9 +522,10 @@ function isoOffset(days: number): string {
 }
 
 /**
- * Seed a brand-new user with three workspaces so the workspace switcher and the
- * standup have something real to show. Runs once (guarded by an empty-workspace
- * check upstream). Everything is written in a single batch.
+ * Seed a brand-new user with a single sandbox workspace ("Test it out") holding
+ * two demo projects, so the switcher, board and standup have something to show
+ * without cluttering the account. Runs once (guarded by an empty-workspace check
+ * upstream). Everything is written in a single batch.
  */
 export async function seedNewUser(user: User): Promise<string> {
   const database = requireDb();
@@ -567,44 +602,28 @@ export async function seedNewUser(user: User): Promise<string> {
     return ref;
   };
 
-  // --- Office ---
-  const office = ws("Office", "💼", now);
-  const officeInbox = proj(office, "Inbox", "Loose tasks not tied to a project", "#6b7280", "Office", true);
-  task(office, officeInbox, "Reply to the BMPC organisers", { priority: "med", dueDate: isoOffset(1) });
-  const solar = proj(office, "SLT Solar Dashboard", "Unified monitoring for 19+ solar sites", "#f5c518", "Office");
-  const report = task(office, solar, "Ship the monthly performance report", {
-    status: "in_progress",
-    priority: "high",
-    dueDate: isoOffset(1),
-    tags: ["report", "recurring"],
-  });
-  task(office, solar, "Pull kWh/kWp comparison per site", { parentRef: report, status: "done", priority: "med" });
-  task(office, solar, "Draft executive summary", { parentRef: report, status: "in_progress", priority: "high", dueDate: isoOffset(0) });
-  task(office, solar, "Get sign-off from operations", { parentRef: report, status: "todo", priority: "med", dueDate: isoOffset(2) });
-  task(office, solar, "Fix Excel upload timeout on large files", { status: "blocked", priority: "urgent", dueDate: isoOffset(-1), tags: ["bug", "backend"] });
-  task(office, solar, "Add site comparison chart (Recharts)", { status: "todo", priority: "med", dueDate: isoOffset(4), tags: ["frontend"] });
-  const powerzenith = proj(office, "PowerZenith", "Real-time energy monitoring + anomaly detection", "#60a5fa", "Office");
-  task(office, powerzenith, "Retrain anomaly model on Q2 data", { status: "todo", priority: "high", dueDate: isoOffset(6), tags: ["ml"] });
-  task(office, powerzenith, "Wire InfluxDB alerts to dashboard", { status: "todo", priority: "med", dueDate: isoOffset(-2) });
+  // --- Test it out (single sandbox workspace) ---
+  const sandbox = ws("Test it out workspace", "🧪", now);
+  proj(sandbox, "Inbox", "Loose tasks not tied to a project", "#6b7280", "Test it out workspace", true);
 
-  // --- Freelance ---
-  const freelance = ws("Freelance", "🚀", now + 1);
-  proj(freelance, "Inbox", "Loose tasks not tied to a project", "#6b7280", "Freelance", true);
-  const gradify = proj(freelance, "Gradify", "Question bank, mock exams, AI marking", "#4ade80", "Freelance");
-  const foundation = task(freelance, gradify, "Foundation phase build", { status: "in_progress", priority: "high", dueDate: isoOffset(3), tags: ["milestone"] });
-  task(freelance, gradify, "Auth + roles (teacher/student)", { parentRef: foundation, status: "todo", priority: "high" });
-  task(freelance, gradify, "Question bank schema", { parentRef: foundation, status: "todo", priority: "med" });
-  task(freelance, gradify, "Define AI marking rubric prompt", { status: "todo", priority: "med", dueDate: isoOffset(5), tags: ["ai"] });
+  // Project 1 — a guided tour of the features.
+  const gettingStarted = proj(sandbox, "Getting started", "A quick tour — delete this whenever you like", "#f5c518", "Test it out workspace");
+  task(sandbox, gettingStarted, "Create your first task", { status: "todo", priority: "high", dueDate: isoOffset(0), tags: ["start-here"] });
+  task(sandbox, gettingStarted, "Try the Board, Members and Calendar views", { status: "todo", priority: "med" });
+  task(sandbox, gettingStarted, "Upload a document in Knowledge", { status: "todo", priority: "med", dueDate: isoOffset(2), tags: ["start-here"] });
+  task(sandbox, gettingStarted, "Ask the brain a question", { status: "in_progress", priority: "med" });
 
-  // --- LeadX ---
-  const leadx = ws("LeadX", "⚡", now + 2);
-  proj(leadx, "Inbox", "Loose tasks not tied to a project", "#6b7280", "LeadX", true);
-  const pipeline = proj(leadx, "Pipeline", "Lead generation and outreach", "#f472b6", "LeadX");
-  task(leadx, pipeline, "Follow up on Predictiv AI conversation", { status: "todo", priority: "high", dueDate: isoOffset(0) });
-  task(leadx, pipeline, "Prep Cresco agri-tech application", { status: "todo", priority: "med", dueDate: isoOffset(7) });
+  // Project 2 — a realistic little task tree so the views have shape.
+  const demo = proj(sandbox, "Demo project", "Sample tasks so the board has something to show", "#60a5fa", "Test it out workspace");
+  const launch = task(sandbox, demo, "Plan the launch", { status: "in_progress", priority: "high", dueDate: isoOffset(3), tags: ["milestone"] });
+  task(sandbox, demo, "Write the brief", { parentRef: launch, status: "done", priority: "med" });
+  task(sandbox, demo, "Design the landing page", { parentRef: launch, status: "in_progress", priority: "high", dueDate: isoOffset(0) });
+  task(sandbox, demo, "Set up analytics", { parentRef: launch, status: "todo", priority: "med", dueDate: isoOffset(4) });
+  task(sandbox, demo, "Fix the sign-up bug", { status: "blocked", priority: "urgent", dueDate: isoOffset(-1), tags: ["bug"] });
+  task(sandbox, demo, "Draft the release notes", { status: "todo", priority: "low", dueDate: isoOffset(5), tags: ["docs"] });
 
   await batch.commit();
-  return office.id;
+  return sandbox.id;
 }
 
 /* ------------------------------ presence ------------------------------ */
@@ -650,4 +669,109 @@ export function watchPresence(uid: string, taskId: string, cb: (p: Presence[]) =
     },
     (err) => console.error("watchPresence error", err)
   );
+}
+
+/* ---------------------------- agent chat history --------------------------- */
+
+/**
+ * Live list of a user's saved chats in a workspace. Single-field
+ * `array-contains` query (no composite index), filtered + sorted in JS.
+ */
+export function watchChats(uid: string, workspaceId: string, cb: (c: Chat[]) => void): Unsubscribe {
+  const q = query(collection(requireDb(), "chats"), where("memberIds", "array-contains", uid));
+  return onSnapshot(
+    q,
+    (snap) => {
+      cb(
+        snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as Omit<Chat, "id">) }))
+          .filter((c) => c.workspaceId === workspaceId)
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+      );
+    },
+    (err) => console.error("watchChats error", err)
+  );
+}
+
+/** Create a new chat, titled from its first message. Returns the new id. */
+export async function createChat(uid: string, workspaceId: string, title: string): Promise<string> {
+  const now = Date.now();
+  const ref = await addDoc(collection(requireDb(), "chats"), {
+    uid,
+    workspaceId,
+    title: title.trim().slice(0, 80) || "New chat",
+    createdAt: now,
+    updatedAt: now,
+    memberIds: [uid],
+  } as Omit<Chat, "id">);
+  return ref.id;
+}
+
+/** Bump a chat's updatedAt (so it sorts to the top), optionally retitling it. */
+export async function touchChat(chatId: string, patch: { title?: string } = {}): Promise<void> {
+  await updateDoc(doc(requireDb(), "chats", chatId), { updatedAt: Date.now(), ...patch });
+}
+
+/** Delete a chat and all of its messages in one batch. Queries by memberIds (the
+ *  only rule-satisfying list filter) and narrows to the chat in JS — a chatId-only
+ *  query is rejected by the rules (rules are not filters). */
+export async function deleteChat(uid: string, chatId: string): Promise<void> {
+  const database = requireDb();
+  const msgs = await getDocs(
+    query(collection(database, "chatMessages"), where("memberIds", "array-contains", uid))
+  );
+  const batch = writeBatch(database);
+  msgs.docs.filter((d) => d.get("chatId") === chatId).forEach((d) => batch.delete(d.ref));
+  batch.delete(doc(database, "chats", chatId));
+  await batch.commit();
+}
+
+/**
+ * Persist one turn. Cards are serialised to JSON (their `data` is loosely typed
+ * and may nest arrays, which Firestore rejects as native fields — the same
+ * trick whiteboards use for Excalidraw scenes).
+ */
+export async function addChatMessage(chatId: string, uid: string, msg: ChatMessage): Promise<void> {
+  await addDoc(collection(requireDb(), "chatMessages"), {
+    chatId,
+    uid,
+    role: msg.role,
+    content: msg.content,
+    steps: msg.steps ?? [],
+    sources: msg.sources ?? [],
+    cardsJson: msg.cards ? JSON.stringify(msg.cards) : "",
+    createdAt: msg.createdAt,
+    memberIds: [uid],
+  });
+}
+
+/** Load a chat's turns in order. Queries by memberIds (the only rule-satisfying
+ *  list filter), then narrows to this chat and sorts in JS. A chatId-only query is
+ *  rejected by the rules (rules are not filters), which is what left chats blank. */
+export async function loadChatMessages(uid: string, chatId: string): Promise<ChatMessage[]> {
+  const snap = await getDocs(
+    query(collection(requireDb(), "chatMessages"), where("memberIds", "array-contains", uid))
+  );
+  return snap.docs
+    .filter((d) => d.get("chatId") === chatId)
+    .map((d) => {
+      const data = d.data() as {
+        role: "user" | "assistant";
+        content: string;
+        steps?: string[];
+        sources?: RetrievedChunk[];
+        cardsJson?: string;
+        createdAt: number;
+      };
+      return {
+        id: d.id,
+        role: data.role,
+        content: data.content,
+        steps: data.steps,
+        sources: data.sources,
+        cards: data.cardsJson ? (JSON.parse(data.cardsJson) as AgentCard[]) : undefined,
+        createdAt: data.createdAt,
+      } satisfies ChatMessage;
+    })
+    .sort((a, b) => a.createdAt - b.createdAt);
 }

@@ -1,7 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { adminDb } from "@/lib/firebase/admin";
-import { embedQuery } from "./voyage";
-import { queryNamespace, queryNamespaces } from "./pinecone";
+import { agenticRetrieve, retrieveAndRerank } from "./retrieval";
 import type { AgentCard, RetrievedChunk, Task, TaskPriority, TaskStatus } from "@/lib/types";
 
 export interface ProjectRef {
@@ -141,16 +140,20 @@ export async function executeTool(
   switch (name) {
     case "search_knowledge": {
       const query = String(input.query ?? "");
-      const vector = await embedQuery(query);
       const target = input.project ? resolveProject(ctx, String(input.project)) : undefined;
-      const chunks = target
-        ? await queryNamespace(target.ragNamespace, vector, 5)
-        : await queryNamespaces(ctx.projects.map((p) => p.ragNamespace), vector, 6);
+      const namespaces = target
+        ? [target.ragNamespace]
+        : ctx.projects.map((p) => p.ragNamespace);
+      const result = await agenticRetrieve(namespaces, query);
+      const chunks = result.chunks;
       ctx.sources.push(...chunks);
+      ctx.steps.push(
+        `retrieved ${chunks.length} chunk(s) in ${result.attempts} attempt(s), graded ${result.grade}`
+      );
       if (chunks.length) ctx.cards.push({ kind: "sources", data: chunks });
       if (!chunks.length) return "No matching documents found in the knowledge base.";
       return JSON.stringify(
-        chunks.map((c) => ({ source: c.source, project: c.project, score: c.score.toFixed(2), text: c.text.slice(0, 700) }))
+        chunks.map((c) => ({ source: c.source, project: c.project, score: c.score.toFixed(2), text: c.text.slice(0, 500) }))
       );
     }
 
@@ -233,7 +236,7 @@ export async function executeTool(
       const tasks = all.filter((t) => t.projectId === target.id).map((t) => compact(t, target.name));
       let chunks: RetrievedChunk[] = [];
       try {
-        chunks = await queryNamespace(target.ragNamespace, await embedQuery(`${target.name} overview status`), 4);
+        chunks = await retrieveAndRerank([target.ragNamespace], `${target.name} overview status`, 4);
         ctx.sources.push(...chunks);
       } catch {
         /* knowledge base may be empty */

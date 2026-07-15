@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { PRIORITY_ORDER, STATUS_ORDER, statusMeta } from "@/lib/constants";
+import { PRIORITY_ORDER, projectStatuses } from "@/lib/constants";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { useTaskActions } from "@/lib/data/useTaskActions";
-import type { Task, TaskStatus } from "@/lib/types";
+import type { Task } from "@/lib/types";
 import { StatusControl } from "@/components/ui/StatusControl";
 import { TagChip } from "@/components/ui/TagChip";
 import { AssigneePicker, DuePicker, PrioritySelect } from "@/components/task/Pickers";
@@ -23,8 +23,9 @@ function sortTasks(a: Task, b: Task): number {
 
 export function ListView({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
   const { user } = useAuth();
-  const { tasks } = useWorkspace();
+  const { tasks, currentProject } = useWorkspace();
   const actions = useTaskActions();
+  const statuses = useMemo(() => projectStatuses(currentProject), [currentProject]);
 
   // Tasks I am assigned to float to the top of each status group; ties fall back
   // to the usual priority-then-due order.
@@ -54,21 +55,27 @@ export function ListView({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
   }, [tasks]);
 
   const groups = useMemo(() => {
-    const g: Record<TaskStatus, Task[]> = { todo: [], in_progress: [], blocked: [], done: [] };
-    tasks.filter((t) => !t.parentId).forEach((t) => g[t.status].push(t));
-    (Object.keys(g) as TaskStatus[]).forEach((s) => g[s].sort(sortMineFirst));
+    const g: Record<string, Task[]> = {};
+    statuses.forEach((s) => (g[s.id] = []));
+    tasks.filter((t) => !t.parentId).forEach((t) => (g[t.status] ?? g.todo).push(t));
+    Object.values(g).forEach((arr) => arr.sort(sortMineFirst));
     return g;
-  }, [tasks, sortMineFirst]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, sortMineFirst, statuses.map((s) => s.id).join(",")]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-4">
-      {STATUS_ORDER.map((status) => {
-        const meta = statusMeta(status);
-        const rows = groups[status];
+      {statuses.map((meta) => {
+        const status = meta.id;
+        const rows = groups[status] ?? [];
         return (
           <section key={status} className="mb-5">
             <div className="mb-1 flex items-center gap-2 px-2">
-              <span className={cn("h-2 w-2 rounded-full", meta.dot)} />
+              {meta.custom ? (
+                <span className="h-2 w-2 rounded-full" style={{ background: meta.hex }} />
+              ) : (
+                <span className={cn("h-2 w-2 rounded-full", meta.dot)} />
+              )}
               <span className="text-[13px] font-semibold text-text">{meta.label}</span>
               <span className="mono text-2xs text-text-faint">{rows.length}</span>
             </div>
