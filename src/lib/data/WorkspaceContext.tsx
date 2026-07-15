@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { projectStatuses, type StatusMeta } from "@/lib/constants";
 import type { Page, Project, Task, Workspace } from "@/lib/types";
 import {
   ensureInbox,
@@ -235,4 +236,11 @@ export function useWorkspace(): WorkspaceState {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useWorkspace must be used within WorkspaceProvider");
   return ctx;
+}
+
+/** The current project's status list (four built-ins + its custom statuses).
+ *  Used by the status picker and views so custom statuses appear everywhere. */
+export function useProjectStatuses(): StatusMeta[] {
+  const { currentProject } = useWorkspace();
+  return useMemo(() => projectStatuses(currentProject), [currentProject]);
 }
