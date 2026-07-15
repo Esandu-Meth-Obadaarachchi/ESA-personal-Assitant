@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/firebase/admin";
-import { loadWorkspace } from "@/lib/ai/server";
+import { loadUserScope } from "@/lib/ai/server";
 import { runAgent, type AgentTurn } from "@/lib/ai/agent";
 import type { ToolContext } from "@/lib/ai/tools";
 import { MAX_CHAT_INPUT_CHARS } from "@/lib/constants";
@@ -24,27 +24,47 @@ export async function POST(req: Request) {
       projectId?: string;
       history?: AgentTurn[];
     };
-    if (!message || !workspaceId) {
-      return NextResponse.json({ error: "message and workspaceId are required" }, { status: 400 });
+    if (!message) {
+      return NextResponse.json({ error: "message is required" }, { status: 400 });
     }
 
-    const { ws, projects } = await loadWorkspace(user.uid, workspaceId);
+    // The agent's scope is everything the user can access, across ALL their
+    // workspaces. `workspaceId`/`projectId` are just the current view, used to
+    // default new tasks and to name the current workspace in the prompt.
+    const { workspaces, projects } = await loadUserScope(user.uid);
 
     const ctx: ToolContext = {
       uid: user.uid,
       userName: user.name ?? "You",
-      workspaceId,
-      memberIds: ws.memberIds,
+      currentWorkspaceId: workspaceId,
       currentProjectId: projectId,
-      projects: projects.map((p) => ({ id: p.id, name: p.name, ragNamespace: p.ragNamespace })),
+      projects: projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        ragNamespace: p.ragNamespace,
+        workspaceId: p.workspaceId,
+        memberIds: p.memberIds ?? [],
+      })),
       sources: [],
       cards: [],
       steps: [],
     };
 
+    // Project list grouped by workspace, so the agent knows what spans where.
+    const wsName = (id: string) => workspaces.find((w) => w.id === id)?.name ?? "Workspace";
+    const grouped = new Map<string, string[]>();
+    for (const p of projects) {
+      const key = wsName(p.workspaceId);
+      grouped.set(key, [...(grouped.get(key) ?? []), p.name]);
+    }
+    const projectList = [...grouped.entries()]
+      .map(([ws, names]) => `${ws}:\n${names.map((n) => `  - ${n}`).join("\n")}`)
+      .join("\n");
+
     const result = await runAgent(message.slice(0, MAX_CHAT_INPUT_CHARS), history ?? [], ctx, {
-      workspaceName: ws.name,
+      workspaceName: workspaces.find((w) => w.id === workspaceId)?.name ?? "your workspaces",
       projectName: projects.find((p) => p.id === projectId)?.name,
+      projectList,
     });
 
     return NextResponse.json(result);

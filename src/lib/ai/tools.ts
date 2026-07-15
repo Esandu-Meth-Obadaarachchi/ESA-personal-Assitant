@@ -7,14 +7,19 @@ export interface ProjectRef {
   id: string;
   name: string;
   ragNamespace: string;
+  /** The workspace this project belongs to (projects span workspaces now). */
+  workspaceId: string;
+  /** Access list, used when creating tasks so the new doc inherits the right members. */
+  memberIds: string[];
 }
 
 export interface ToolContext {
   uid: string;
   userName: string;
-  workspaceId: string;
-  memberIds: string[];
+  /** The workspace the user is currently viewing — used only as a default for new tasks. */
+  currentWorkspaceId?: string;
   currentProjectId?: string;
+  /** Every project the user can access, across ALL their workspaces. */
   projects: ProjectRef[];
   // artifacts accumulated during a run, surfaced back to the UI
   sources: RetrievedChunk[];
@@ -94,7 +99,15 @@ export const TOOLS: Anthropic.Tool[] = [
 /* --------------------------------- helpers --------------------------------- */
 
 function resolveProject(ctx: ToolContext, name?: string): ProjectRef | undefined {
-  if (!name) return ctx.projects.find((p) => p.id === ctx.currentProjectId) ?? ctx.projects[0];
+  if (!name) {
+    // No project named: default to the current one, else the current workspace's
+    // first project, else anything accessible.
+    return (
+      ctx.projects.find((p) => p.id === ctx.currentProjectId) ??
+      ctx.projects.find((p) => p.workspaceId === ctx.currentWorkspaceId) ??
+      ctx.projects[0]
+    );
+  }
   const n = name.toLowerCase();
   return (
     ctx.projects.find((p) => p.name.toLowerCase() === n) ??
@@ -104,11 +117,12 @@ function resolveProject(ctx: ToolContext, name?: string): ProjectRef | undefined
 
 type TaskDoc = Task & { memberIds?: string[] };
 
-async function fetchWorkspaceTasks(ctx: ToolContext): Promise<TaskDoc[]> {
-  const snap = await adminDb().collection("tasks").where("workspaceId", "==", ctx.workspaceId).get();
-  return snap.docs
-    .map((d) => ({ id: d.id, ...(d.data() as Omit<TaskDoc, "id">) }))
-    .filter((t) => t.memberIds?.includes(ctx.uid) ?? true);
+/** Every task the user can access, across ALL their workspaces. The
+ *  `memberIds array-contains` query is the same isolation gate the client uses,
+ *  so this only ever returns tasks the user is a member of. */
+async function fetchAccessibleTasks(ctx: ToolContext): Promise<TaskDoc[]> {
+  const snap = await adminDb().collection("tasks").where("memberIds", "array-contains", ctx.uid).get();
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<TaskDoc, "id">) }));
 }
 
 function isOverdue(t: Task): boolean {
@@ -158,7 +172,7 @@ export async function executeTool(
     }
 
     case "list_tasks": {
-      const all = await fetchWorkspaceTasks(ctx);
+      const all = await fetchAccessibleTasks(ctx);
       const target = input.project ? resolveProject(ctx, String(input.project)) : undefined;
       let rows = target ? all.filter((t) => t.projectId === target.id) : all;
       if (input.status) rows = rows.filter((t) => t.status === input.status);
@@ -175,7 +189,7 @@ export async function executeTool(
       if (!target) return "No project available to create the task in.";
       let parentId: string | null = null;
       if (input.parent_title) {
-        const all = await fetchWorkspaceTasks(ctx);
+        const all = await fetchAccessibleTasks(ctx);
         const parent = all.find(
           (t) =>
             t.projectId === target.id &&
@@ -185,7 +199,7 @@ export async function executeTool(
       }
       const now = Date.now();
       const doc = {
-        workspaceId: ctx.workspaceId,
+        workspaceId: target.workspaceId,
         projectId: target.id,
         parentId,
         title: String(input.title),
@@ -205,7 +219,7 @@ export async function executeTool(
         createdAt: now,
         updatedAt: now,
         createdBy: ctx.uid,
-        memberIds: ctx.memberIds,
+        memberIds: target.memberIds,
       };
       const ref = await adminDb().collection("tasks").add(doc);
       ctx.cards.push({ kind: "created_task", data: { id: ref.id, ...doc, project: target.name } });
@@ -213,7 +227,7 @@ export async function executeTool(
     }
 
     case "update_task": {
-      const all = await fetchWorkspaceTasks(ctx);
+      const all = await fetchAccessibleTasks(ctx);
       const q = String(input.task_title ?? "").toLowerCase();
       const match =
         all.find((t) => t.title.toLowerCase() === q) ??
@@ -232,7 +246,7 @@ export async function executeTool(
     case "summarize_project": {
       const target = resolveProject(ctx, input.project ? String(input.project) : undefined);
       if (!target) return "Project not found.";
-      const all = await fetchWorkspaceTasks(ctx);
+      const all = await fetchAccessibleTasks(ctx);
       const tasks = all.filter((t) => t.projectId === target.id).map((t) => compact(t, target.name));
       let chunks: RetrievedChunk[] = [];
       try {

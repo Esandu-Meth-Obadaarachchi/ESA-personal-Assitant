@@ -20,7 +20,7 @@ Retrieve (search_knowledge tool / /api/related)
   query -> Voyage embedQuery -> Pinecone query in namespace(s) -> top-k chunks
 ```
 
-Each project owns a Pinecone **namespace** (`project.ragNamespace`), so knowledge is isolated per project. Cross-project search merges results from every namespace **the user can access** by score (`queryNamespaces`). `loadWorkspace` filters projects by per-project scope, so a scoped member can never retrieve another project's knowledge through the agent.
+Each project owns a Pinecone **namespace** (`project.ragNamespace`), so knowledge is isolated per project. The agent searches across every project **the user can access, in all their workspaces** (`loadUserScope` in `src/lib/ai/server.ts`), merging namespaces by score (`queryNamespaces`). Every project is gated by `memberIds`, so a scoped member can never retrieve another project's knowledge — access spans workspaces, isolation does not leak.
 
 ## The agent loop (`src/lib/ai/agent.ts`)
 

@@ -56,17 +56,12 @@ export default function AgentPage() {
     return watchAllTasks(user.uid, setAllTasks);
   }, [user]);
 
-  // Live list of this user's saved chats in the current workspace.
+  // Live list of ALL this user's saved chats — global across workspaces, so the
+  // conversation stays open when the user switches workspace.
   useEffect(() => {
-    if (!user || !currentWorkspace) return;
-    return watchChats(user.uid, currentWorkspace.id, setChats);
-  }, [user, currentWorkspace]);
-
-  // Switching workspace starts a fresh conversation.
-  useEffect(() => {
-    setCurrentChatId(null);
-    setMessages([]);
-  }, [currentWorkspace?.id]);
+    if (!user) return;
+    return watchChats(user.uid, setChats);
+  }, [user]);
 
   const wsTasks = useMemo(
     () => (currentWorkspace ? allTasks.filter((t) => t.workspaceId === currentWorkspace.id) : allTasks),
