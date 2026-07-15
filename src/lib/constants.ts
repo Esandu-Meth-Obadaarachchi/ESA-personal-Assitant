@@ -60,3 +60,20 @@ export const WORKSPACE_EMOJIS = ["🏢", "💼", "🚀", "🌿", "🎓", "🏨",
 /** Max characters for a single agent chat message. Caps input tokens and cost;
  *  enforced on the composer and again server-side in /api/chat. */
 export const MAX_CHAT_INPUT_CHARS = 2000;
+
+/** Preset roles for the project Team tab. Free text is still allowed on top. */
+export const PROJECT_ROLES = [
+  "Full stack",
+  "Frontend",
+  "Backend",
+  "DevOps",
+  "Mobile",
+  "ML / AI",
+  "Data",
+  "QA",
+  "Design",
+  "PM",
+];
+
+/** Max characters of a brief the AI will turn into tasks. Caps input cost. */
+export const MAX_BRIEF_CHARS = 12000;
