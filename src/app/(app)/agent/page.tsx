@@ -167,8 +167,9 @@ export default function AgentPage() {
                 ...m,
                 pending: false,
                 content:
-                  "I couldn't reach the model. Check that `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY` and the Firebase Admin keys are set.\n\n> " +
-                  (e instanceof Error ? e.message : String(e)),
+                  "⚠️ Something went wrong reaching the agent.\n\n> " +
+                  (e instanceof Error ? e.message : String(e)) +
+                  "\n\nIf this keeps happening, check the API keys are set, or try a smaller request.",
               }
             : m
         )

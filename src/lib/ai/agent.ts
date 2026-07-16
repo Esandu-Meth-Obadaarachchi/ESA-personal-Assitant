@@ -62,12 +62,30 @@ export async function runAgent(
       messages,
     });
 
-    if (resp.stop_reason !== "tool_use") {
-      let answer = resp.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("\n")
-        .trim();
+    // The model was cut off mid-response — almost always a create_tasks call too
+    // big for one turn's token budget. A truncated tool call cannot be executed,
+    // so stop and say so plainly instead of returning an empty "…". Whatever ran
+    // in earlier rounds is still shown via cards.
+    if (resp.stop_reason === "max_tokens") {
+      ctx.steps.push("⚠️ response hit the length limit and was cut off");
+      const partial = textOf(resp).trim();
+      return {
+        answer:
+          (partial ? partial + "\n\n" : "") +
+          "⚠️ My reply got cut off — that was too much to do in one message. Try a smaller batch (for example 3–4 items at a time) and I'll finish each. Anything already created is shown below.",
+        steps: ctx.steps,
+        sources: dedupe(ctx.sources),
+        cards: ctx.cards,
+      };
+    }
+
+    const toolUses = resp.content.filter(
+      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
+    );
+
+    // No tool calls -> this is the final answer.
+    if (toolUses.length === 0) {
+      let answer = textOf(resp).trim();
       const sources = dedupe(ctx.sources);
       // Grounded self-check: when the answer drew on retrieved documents, verify
       // every claim is supported. A miss appends a subtle caveat instead of
@@ -87,33 +105,49 @@ export async function runAgent(
           /* non-fatal — never block a reply on the self-check */
         }
       }
+      if (!answer) {
+        answer =
+          "I couldn't produce a response for that. Try rephrasing, or breaking it into a smaller request.";
+      }
       return { answer, steps: ctx.steps, sources, cards: ctx.cards };
     }
 
     messages.push({ role: "assistant", content: resp.content });
 
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
-    for (const block of resp.content) {
-      if (block.type !== "tool_use") continue;
+    for (const block of toolUses) {
       const input = (block.input ?? {}) as Record<string, unknown>;
       ctx.steps.push(`${block.name}(${summarizeArgs(input)})`);
       let result: string;
+      let isError = false;
       try {
         result = await executeTool(block.name, input, ctx);
       } catch (e) {
-        result = `Tool error: ${e instanceof Error ? e.message : String(e)}`;
+        isError = true;
+        const msg = e instanceof Error ? e.message : String(e);
+        result = `Tool error: ${msg}`;
+        ctx.steps.push(`⚠️ ${block.name} failed: ${msg}`);
       }
-      toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+      toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result, is_error: isError });
     }
     messages.push({ role: "user", content: toolResults });
   }
 
   return {
-    answer: "I ran out of steps before finishing that — try narrowing the request.",
+    answer:
+      "I ran out of steps before finishing that. It was a big request — try fewer items at a time, or reply \"continue\" and I'll carry on. Anything created so far is shown below.",
     steps: ctx.steps,
     sources: dedupe(ctx.sources),
     cards: ctx.cards,
   };
+}
+
+/** All text blocks of a response, joined. */
+function textOf(resp: Anthropic.Message): string {
+  return resp.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n");
 }
 
 function dedupe(chunks: RetrievedChunk[]): RetrievedChunk[] {
