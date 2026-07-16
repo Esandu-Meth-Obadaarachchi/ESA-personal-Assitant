@@ -27,6 +27,15 @@ export interface ToolContext {
   steps: string[];
 }
 
+/** A node in a create_tasks tree: a task with optional nested subtasks. */
+interface TaskNodeInput {
+  title?: string;
+  status?: string;
+  priority?: string;
+  due_date?: string;
+  subtasks?: TaskNodeInput[];
+}
+
 /** Tool schemas advertised to Claude. */
 export const TOOLS: Anthropic.Tool[] = [
   {
@@ -65,7 +74,8 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "create_task",
-    description: "Create a new task or subtask. Resolve relative dates to yyyy-mm-dd before calling.",
+    description:
+      "Create ONE new task or subtask. For several tasks at once, or ANY task that has subtasks, use create_tasks instead — it is far more reliable. Resolve relative dates to yyyy-mm-dd before calling.",
     input_schema: {
       type: "object",
       properties: {
@@ -77,6 +87,38 @@ export const TOOLS: Anthropic.Tool[] = [
         parent_title: { type: "string", description: "If this is a subtask, the parent task's title" },
       },
       required: ["title"],
+    },
+  },
+  {
+    name: "create_tasks",
+    description:
+      "Create MANY tasks and/or nested subtasks in one call. Use this whenever you need to create more than one task, or any task that has subtasks — it builds the whole tree at once with exact parent-child links, so it is reliable where many separate create_task calls would run out of steps. If the tree is very large, split it across a few create_tasks calls (e.g. a few top-level tasks per call).",
+    input_schema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Project name; defaults to the current project" },
+        tasks: {
+          type: "array",
+          description:
+            "Top-level tasks to create. Each item is a task node with a `title` and an optional `subtasks` array of the same shape (nested to any depth).",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              status: { type: "string", enum: ["todo", "in_progress", "blocked", "done"] },
+              priority: { type: "string", enum: ["low", "med", "high", "urgent"] },
+              due_date: { type: "string", description: "yyyy-mm-dd" },
+              subtasks: {
+                type: "array",
+                description: "Nested subtasks — same shape (title + optional subtasks).",
+                items: { type: "object" },
+              },
+            },
+            required: ["title"],
+          },
+        },
+      },
+      required: ["tasks"],
     },
   },
   {
@@ -268,6 +310,67 @@ export async function executeTool(
       const ref = await adminDb().collection("tasks").add(doc);
       ctx.cards.push({ kind: "created_task", data: { id: ref.id, ...doc, project: target.name } });
       return `Created task "${doc.title}" in ${target.name}${doc.dueDate ? ` due ${doc.dueDate}` : ""}.`;
+    }
+
+    case "create_tasks": {
+      const target = resolveProject(ctx, input.project ? String(input.project) : undefined);
+      if (!target) return "No project available to create tasks in.";
+      const roots = Array.isArray(input.tasks) ? (input.tasks as TaskNodeInput[]) : [];
+      if (roots.length === 0) return "No tasks were provided to create.";
+
+      const now = Date.now();
+      let order = now;
+      let count = 0;
+      const summary: Array<Record<string, unknown>> = [];
+
+      // Recursively create a node and its subtasks, threading the real parent id
+      // so nesting is exact (no title matching, so identical subtask names across
+      // many parents nest correctly).
+      const createNode = async (node: TaskNodeInput, parentId: string | null, parentTitle: string | null) => {
+        const title = String(node?.title ?? "").trim();
+        if (!title) return;
+        const doc = {
+          workspaceId: target.workspaceId,
+          projectId: target.id,
+          parentId,
+          title,
+          notes: "",
+          status: (node.status as TaskStatus) ?? "todo",
+          priority: (node.priority as TaskPriority) ?? "med",
+          assignees: [{ id: ctx.uid, name: ctx.userName, avatar: null }],
+          assigneeId: ctx.uid,
+          assigneeName: ctx.userName,
+          assigneeAvatar: null,
+          dueDate: (node.due_date as string) || null,
+          startDate: null,
+          tags: [] as string[],
+          dependencies: [] as string[],
+          linkedDocs: [] as [],
+          order: order++,
+          createdAt: now,
+          updatedAt: now,
+          createdBy: ctx.uid,
+          memberIds: target.memberIds,
+        };
+        const ref = await adminDb().collection("tasks").add(doc);
+        count++;
+        summary.push({
+          id: ref.id,
+          title,
+          status: doc.status,
+          priority: doc.priority,
+          due: doc.dueDate,
+          project: target.name,
+          parent: parentTitle,
+        });
+        const subs = Array.isArray(node.subtasks) ? node.subtasks : [];
+        for (const s of subs) await createNode(s, ref.id, title);
+      };
+
+      for (const r of roots) await createNode(r, null, null);
+      // One list card showing the whole tree that was created (parent shown as ↳).
+      ctx.cards.push({ kind: "task_list", data: summary });
+      return `Created ${count} task${count === 1 ? "" : "s"} (with their subtasks) in ${target.name}.`;
     }
 
     case "update_task": {

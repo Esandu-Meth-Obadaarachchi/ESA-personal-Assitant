@@ -2,7 +2,10 @@
 
 Notable changes, newest first. Product name: **Lune AI**.
 
-## 2026-07-16 — Agent sees assignees and subtasks
+## 2026-07-16 — Reliable task trees + assignees/subtasks
+
+### Added
+- **`create_tasks` batch tool.** The agent can build a whole task tree — tasks with nested subtasks — in a single call, with exact parent-child links. This fixes the agent creating top-level tasks but stopping before the subtasks (it used to run out of tool rounds making one `create_task` call per node), and makes deep nesting (identical subtask names under many parents) reliable. Tool-round cap raised 4 → 6 for headroom.
 
 ### Fixed
 - **The agent could not answer "who is X's tasks" or "subtasks of Y".** `list_tasks` was dropping the assignee and parent-task fields, and had no filter for either. It now returns each task's assignee and parent, and accepts an `assignee` filter and an `under` filter (a parent task's title → its subtasks). The persona prompt tells the agent to use them. The `task_list` card shows the assignee, parent (↳) and subtask count.

@@ -8,7 +8,7 @@ import type { AgentCard, RetrievedChunk } from "@/lib/types";
 // Cost caps. Output tokens are the expensive side (Opus), and each tool round
 // re-sends the growing context, so both are bounded.
 const MAX_ANSWER_TOKENS = 1024; // ceiling on generated output per reply
-const MAX_TOOL_ROUNDS = 4; // ceiling on tool-loop iterations
+const MAX_TOOL_ROUNDS = 6; // ceiling on tool-loop iterations (headroom for batch create_tasks)
 
 export interface AgentTurn {
   role: "user" | "assistant";

@@ -38,7 +38,8 @@ Thinking is left off for snappy replies; the persona (`persona.ts`) instructs Cl
 |---|---|---|
 | `search_knowledge` | Voyage + Pinecone retrieval | emits a `sources` card |
 | `list_tasks` | tasks across all the user's workspaces, filterable by project, **assignee**, **parent task (subtasks-of)**, status or time; each row carries its assignee + parent | emits a `task_list` card |
-| `create_task` | write a task via admin | emits a `created_task` card |
+| `create_task` | write a single task via admin | emits a `created_task` card |
+| `create_tasks` | write many tasks / a nested subtask tree in one call (exact parent-child links) | emits a `task_list` card |
 | `update_task` | fuzzy-match by title, patch via admin | emits an `updated_task` card |
 | `summarize_project` | tasks + top knowledge for the model to summarise | emits sources |
 
