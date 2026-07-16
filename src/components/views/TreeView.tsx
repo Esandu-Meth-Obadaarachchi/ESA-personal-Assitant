@@ -12,12 +12,17 @@ import { QuickAdd, TaskRow } from "@/components/task/TaskRow";
 export function TreeView({
   onOpenTask,
   selectedId,
+  tasks: tasksProp,
 }: {
   onOpenTask: (t: Task) => void;
   selectedId?: string;
+  /** Cross-project task set (My Tasks). When given, creation affordances are hidden. */
+  tasks?: Task[];
 }) {
   const { user } = useAuth();
-  const { tasks } = useWorkspace();
+  const ctx = useWorkspace();
+  const tasks = tasksProp ?? ctx.tasks;
+  const crossProject = tasksProp != null;
   const actions = useTaskActions();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [addingUnder, setAddingUnder] = useState<string | null>(null);
@@ -62,10 +67,14 @@ export function TreeView({
               selected={node.id === selectedId}
               onToggleCollapse={() => toggle(node.id)}
               onOpen={() => onOpenTask(node)}
-              onAddSubtask={() => {
-                expand(node.id);
-                setAddingUnder(node.id);
-              }}
+              onAddSubtask={
+                crossProject
+                  ? undefined
+                  : () => {
+                      expand(node.id);
+                      setAddingUnder(node.id);
+                    }
+              }
             />
             {addingUnder === node.id && (
               <QuickAdd
@@ -86,17 +95,23 @@ export function TreeView({
             <ListTree className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-sm font-medium text-text">No tasks yet</div>
+            <div className="text-sm font-medium text-text">
+              {crossProject ? "Nothing assigned to you" : "No tasks yet"}
+            </div>
             <div className="mt-0.5 text-xs text-text-muted">
-              Add your first task below, or ask the brain to break down a goal.
+              {crossProject
+                ? "Tasks assigned to you across all projects will show here."
+                : "Add your first task below, or ask the brain to break down a goal."}
             </div>
           </div>
         </div>
       ) : null}
 
-      <div className="mt-1.5 border-t border-border/60 pt-1.5">
-        <QuickAdd placeholder="Add task" onAdd={(title) => actions.add(title)} />
-      </div>
+      {!crossProject && (
+        <div className="mt-1.5 border-t border-border/60 pt-1.5">
+          <QuickAdd placeholder="Add task" onAdd={(title) => actions.add(title)} />
+        </div>
+      )}
     </div>
   );
 }
