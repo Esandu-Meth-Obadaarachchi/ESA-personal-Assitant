@@ -45,11 +45,19 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: "list_tasks",
     description:
-      "List tasks. Use to answer 'what's overdue', 'what's due today', 'what's on my plate', project status, etc.",
+      "List tasks with their project, status, priority, due date, ASSIGNEE and PARENT task. Use to answer 'what's overdue', 'what's due today', 'what's on my plate', 'what's assigned to <person>', 'what are the subtasks of <task>', project status, etc. Each result shows who it is assigned to and, if it is a subtask, its parent task's title.",
     input_schema: {
       type: "object",
       properties: {
         project: { type: "string", description: "Optional project name to scope to" },
+        assignee: {
+          type: "string",
+          description: "Optional person's name — return only tasks assigned to them (matches on assignee name)",
+        },
+        under: {
+          type: "string",
+          description: "Optional parent task title — return that task's direct subtasks (the breakdown under it)",
+        },
         status: { type: "string", enum: ["todo", "in_progress", "blocked", "done"] },
         filter: { type: "string", enum: ["overdue", "due_today", "all"], description: "Time filter" },
       },
@@ -131,7 +139,13 @@ function isOverdue(t: Task): boolean {
 function isDueToday(t: Task): boolean {
   return t.dueDate === new Date().toISOString().slice(0, 10) && t.status !== "done";
 }
-function compact(t: Task, projName?: string) {
+/** The assignee name(s) on a task, tolerating the legacy single-assignee fields. */
+function assigneeNames(t: TaskDoc): string[] {
+  const names = [t.assigneeName, ...((t.assignees ?? []).map((a) => a.name))];
+  return names.filter((n): n is string => !!n);
+}
+
+function compact(t: TaskDoc, projName?: string, parentTitle?: string | null, subtaskCount = 0) {
   return {
     id: t.id,
     title: t.title,
@@ -139,6 +153,9 @@ function compact(t: Task, projName?: string) {
     priority: t.priority,
     due: t.dueDate ?? null,
     project: projName ?? null,
+    assignee: assigneeNames(t).join(", ") || null,
+    parent: parentTitle ?? null, // null => a top-level task
+    subtasks: subtaskCount, // number of direct children
   };
 }
 
@@ -173,13 +190,40 @@ export async function executeTool(
 
     case "list_tasks": {
       const all = await fetchAccessibleTasks(ctx);
+      const byId = new Map(all.map((t) => [t.id, t]));
+      const childCount = new Map<string, number>();
+      all.forEach((t) => {
+        if (t.parentId) childCount.set(t.parentId, (childCount.get(t.parentId) ?? 0) + 1);
+      });
+
       const target = input.project ? resolveProject(ctx, String(input.project)) : undefined;
       let rows = target ? all.filter((t) => t.projectId === target.id) : all;
+
+      // "under": the subtasks of a specific parent task (matched by title).
+      if (input.under) {
+        const q = String(input.under).toLowerCase();
+        const parent =
+          rows.find((t) => t.title.toLowerCase() === q) ??
+          rows.find((t) => t.title.toLowerCase().includes(q));
+        if (!parent) return `No task found matching "${input.under}" to list subtasks of.`;
+        rows = all.filter((t) => t.parentId === parent.id);
+      }
+
+      // "assignee": tasks assigned to a named person (fuzzy on assignee name).
+      if (input.assignee) {
+        const q = String(input.assignee).toLowerCase();
+        rows = rows.filter((t) =>
+          assigneeNames(t).some((n) => n.toLowerCase().includes(q) || q.includes(n.toLowerCase()))
+        );
+      }
+
       if (input.status) rows = rows.filter((t) => t.status === input.status);
       if (input.filter === "overdue") rows = rows.filter(isOverdue);
       if (input.filter === "due_today") rows = rows.filter(isDueToday);
       rows = rows.sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999")).slice(0, 40);
-      const data = rows.map((t) => compact(t, projName(t.projectId)));
+      const data = rows.map((t) =>
+        compact(t, projName(t.projectId), t.parentId ? byId.get(t.parentId)?.title ?? null : null, childCount.get(t.id) ?? 0)
+      );
       ctx.cards.push({ kind: "task_list", data });
       return JSON.stringify({ count: rows.length, tasks: data });
     }

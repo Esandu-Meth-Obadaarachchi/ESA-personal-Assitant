@@ -15,6 +15,9 @@ interface TaskLike {
   priority?: string;
   due?: string | null;
   dueDate?: string | null;
+  assignee?: string | null;
+  parent?: string | null;
+  subtasks?: number;
 }
 
 export function AgentCards({ cards }: { cards: AgentCard[] }) {
@@ -82,7 +85,10 @@ function TaskList({ data }: { data: TaskLike[] }) {
                 )}
               >
                 {t.title}
+                {t.parent && <span className="ml-1.5 text-2xs text-text-faint">↳ {t.parent}</span>}
+                {!!t.subtasks && <span className="ml-1.5 text-2xs text-text-faint">· {t.subtasks} sub</span>}
               </span>
+              {t.assignee && <span className="hidden shrink-0 text-2xs text-text-muted sm:inline">{t.assignee}</span>}
               {t.project && <span className="hidden text-2xs text-text-faint sm:inline">{t.project}</span>}
               {t.due && <DueDateChip date={t.due} status={t.status as never} icon={false} />}
             </div>
