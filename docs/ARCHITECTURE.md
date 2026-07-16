@@ -42,10 +42,14 @@ The Firestore client is initialised with **forced long-polling** (`lib/firebase/
 
 **Pages**: `PageView` loads a page once, renders the BlockNote editor (`BlockEditor`, dynamic `ssr:false`), and autosaves the serialised blocks with a debounce. The whiteboard and day planner follow the same load-once + debounced-save pattern.
 
+**Cross-project views (All my tasks)**: the project views (`TreeView`, `ListView`, `KanbanBoard`, `CalendarView`) each take an optional `tasks` prop, defaulting to the current project's tasks from context. `/my-tasks` filters `allTasks` (every task the user can see) down to the ones assigned to them and feeds that set to whichever view is selected. Creation affordances are hidden in this cross-project mode (there is no single target project); edits (status/priority/due/assignee) still work because those mutations are id-based, not project-bound. Same pattern powers the per-assignee Members board.
+
+**Batch task creation**: the agent's `create_tasks` tool builds a whole nested task tree in one call (recursive create, exact parent ids), so the model does not run out of tool rounds emitting one `create_task` per node. The agent loop also detects a truncated response (`stop_reason: max_tokens`) and returns an actionable message instead of an empty reply. See `docs/RAG.md` §4.
+
 ## Route groups
 
 - `(auth)` — unauthenticated (`/login`, which doubles as the marketing/landing surface).
-- `(app)` — auth-guarded; layout redirects to `/login` when signed out and wraps `WorkspaceProvider` + `AppFrame` (collapsible sidebar + content + seeding overlay). Screens: project view (`/`), `/today`, `/overview`, `/workspaces`, `/pages` + `/pages/[id]`, `/agent`, `/knowledge`.
+- `(app)` — auth-guarded; layout redirects to `/login` when signed out and wraps `WorkspaceProvider` + `AppFrame` (collapsible sidebar + mobile drawer + content + seeding overlay). Screens: project view (`/`), `/today`, `/overview`, `/workspaces`, `/my-tasks`, `/pages` + `/pages/[id]`, `/agent`, `/knowledge`.
 
 ## Why Next.js (not plain Vite React)
 

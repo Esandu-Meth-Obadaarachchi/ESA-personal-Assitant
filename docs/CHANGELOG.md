@@ -2,6 +2,15 @@
 
 Notable changes, newest first. Product name: **Lune AI**.
 
+## 2026-07-16 — Docs deep-dive
+
+- Rewrote `docs/RAG.md` and `docs/AGENTIC_RAG.md` as full teaching guides: the ingestion pipeline (parse/chunk/embed/upsert), embeddings and the vector store, the bi-encoder vs cross-encoder two-stage retrieval, the agentic loop, the agent tool loop, the cost model, security/isolation, observability, design choices and every fix — the what, how and why. Refreshed `docs/ARCHITECTURE.md`.
+
+## 2026-07-16 — All my tasks
+
+### Added
+- **"All my tasks"** — a new sidebar item (under All workspaces) and `/my-tasks` page showing every task assigned to you across every project and workspace, in the same **List / Board / Tree / Calendar** views used inside a project. The view components now take an optional `tasks` prop (defaulting to the current project) so they render any task set; creation affordances are hidden in the cross-project view. Still membership-gated — only tasks you can see appear.
+
 ## 2026-07-16 — Reliable task trees + assignees/subtasks
 
 ### Added
