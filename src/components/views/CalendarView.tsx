@@ -29,7 +29,7 @@ import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { useTaskActions } from "@/lib/data/useTaskActions";
 import { authedFetch } from "@/lib/api";
 import { toISODate } from "@/lib/date";
-import type { Task } from "@/lib/types";
+import type { Project, Task } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { CalendarSync } from "@/components/project/CalendarSync";
 import { DayDetail } from "./DayDetail";
@@ -44,8 +44,20 @@ export interface GEvent {
   allDay: boolean;
 }
 
-export function CalendarView({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
-  const { workspaceTasks: tasks, projects } = useWorkspace();
+export function CalendarView({
+  onOpenTask,
+  tasks: tasksProp,
+  projects: projectsProp,
+}: {
+  onOpenTask: (t: Task) => void;
+  /** Cross-project task set (My Tasks). Defaults to the current workspace's tasks. */
+  tasks?: Task[];
+  /** Projects used for colour/name lookup (pass all projects for the cross-project view). */
+  projects?: Project[];
+}) {
+  const ctx = useWorkspace();
+  const tasks = tasksProp ?? ctx.workspaceTasks;
+  const projects = projectsProp ?? ctx.projects;
   const actions = useTaskActions();
   const [month, setMonth] = useState(() => new Date());
   const [activeId, setActiveId] = useState<string | null>(null);

@@ -21,11 +21,23 @@ function sortTasks(a: Task, b: Task): number {
   return (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999");
 }
 
-export function ListView({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
+export function ListView({
+  onOpenTask,
+  tasks: tasksProp,
+}: {
+  onOpenTask: (t: Task) => void;
+  /** Cross-project task set (My Tasks). Uses the built-in statuses and hides add rows. */
+  tasks?: Task[];
+}) {
   const { user } = useAuth();
-  const { tasks, currentProject } = useWorkspace();
+  const ctx = useWorkspace();
+  const tasks = tasksProp ?? ctx.tasks;
+  const crossProject = tasksProp != null;
   const actions = useTaskActions();
-  const statuses = useMemo(() => projectStatuses(currentProject), [currentProject]);
+  const statuses = useMemo(
+    () => projectStatuses(crossProject ? null : ctx.currentProject),
+    [ctx.currentProject, crossProject]
+  );
 
   // Tasks I am assigned to float to the top of each status group; ties fall back
   // to the usual priority-then-due order.
@@ -91,12 +103,17 @@ export function ListView({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
                   childrenByParent={childrenByParent}
                 />
               ))}
-              <div className={cn("px-2", rows.length > 0 && "border-t border-border/60")}>
-                <QuickAdd
-                  placeholder={`Add task to ${meta.label}`}
-                  onAdd={(title) => actions.add(title, { status })}
-                />
-              </div>
+              {rows.length === 0 && crossProject && (
+                <div className="px-3 py-2 text-2xs text-text-faint">Nothing here</div>
+              )}
+              {!crossProject && (
+                <div className={cn("px-2", rows.length > 0 && "border-t border-border/60")}>
+                  <QuickAdd
+                    placeholder={`Add task to ${meta.label}`}
+                    onAdd={(title) => actions.add(title, { status })}
+                  />
+                </div>
+              )}
             </div>
           </section>
         );

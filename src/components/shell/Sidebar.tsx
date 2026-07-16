@@ -11,6 +11,7 @@ import {
   Boxes,
   Inbox,
   LayoutGrid,
+  ListChecks,
   LogOut,
   Moon,
   PanelLeftClose,
@@ -181,6 +182,18 @@ export function Sidebar({
         >
           <Boxes className="h-4 w-4" />
           All workspaces
+        </Link>
+        <Link
+          href="/my-tasks"
+          className={cn(
+            "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
+            pathname === "/my-tasks"
+              ? "bg-surface-2 text-text"
+              : "text-text-muted hover:bg-surface-2 hover:text-text"
+          )}
+        >
+          <ListChecks className="h-4 w-4" />
+          All my tasks
         </Link>
         <Link
           href="/agent"
