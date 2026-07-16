@@ -2,6 +2,14 @@
 
 Notable changes, newest first. Product name: **Lune AI**.
 
+## 2026-07-16 — Agent sees assignees and subtasks
+
+### Fixed
+- **The agent could not answer "who is X's tasks" or "subtasks of Y".** `list_tasks` was dropping the assignee and parent-task fields, and had no filter for either. It now returns each task's assignee and parent, and accepts an `assignee` filter and an `under` filter (a parent task's title → its subtasks). The persona prompt tells the agent to use them. The `task_list` card shows the assignee, parent (↳) and subtask count.
+
+### Also
+- The Agent page is mobile-responsive (chat-list drawer, collapsible standup, roomy composer).
+
 ## 2026-07-15 — Cross-workspace agent + global chat history
 
 ### Changed
