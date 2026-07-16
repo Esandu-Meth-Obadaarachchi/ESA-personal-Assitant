@@ -8,6 +8,9 @@ Notable changes, newest first. Product name: **Lune AI**.
 - **`create_tasks` batch tool.** The agent can build a whole task tree — tasks with nested subtasks — in a single call, with exact parent-child links. This fixes the agent creating top-level tasks but stopping before the subtasks (it used to run out of tool rounds making one `create_task` call per node), and makes deep nesting (identical subtask names under many parents) reliable. Tool-round cap raised 4 → 6 for headroom.
 
 ### Fixed
+- **Silent "…" on an over-long request.** When a batch was too big, the model's tool call exceeded the output-token cap (`stop_reason: max_tokens`) and the agent returned an empty answer that rendered as "…". It now detects truncation and says so, telling the user to split into smaller batches, and keeps whatever was already created. Tool-execution errors are surfaced in the action trace and marked `is_error`, and an empty answer falls back to a clear message instead of blank.
+
+### Fixed
 - **The agent could not answer "who is X's tasks" or "subtasks of Y".** `list_tasks` was dropping the assignee and parent-task fields, and had no filter for either. It now returns each task's assignee and parent, and accepts an `assignee` filter and an `under` filter (a parent task's title → its subtasks). The persona prompt tells the agent to use them. The `task_list` card shows the assignee, parent (↳) and subtask count.
 
 ### Also
