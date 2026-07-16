@@ -84,7 +84,7 @@ updatedAt: number
 memberIds: string[]         # always [uid]
 ```
 
-### `chats/{id}`  (saved agent conversations, personal to one user)
+### `chats/{id}`  (saved agent conversations, personal to one user, global across workspaces)
 ```
 uid: string
 workspaceId: string

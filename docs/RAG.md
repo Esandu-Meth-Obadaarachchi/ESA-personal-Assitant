@@ -20,7 +20,7 @@ Retrieve (search_knowledge tool / /api/related)
   query -> Voyage embedQuery -> Pinecone query in namespace(s) -> top-k chunks
 ```
 
-Each project owns a Pinecone **namespace** (`project.ragNamespace`), so knowledge is isolated per project. Cross-project search merges results from every namespace **the user can access** by score (`queryNamespaces`). `loadWorkspace` filters projects by per-project scope, so a scoped member can never retrieve another project's knowledge through the agent.
+Each project owns a Pinecone **namespace** (`project.ragNamespace`), so knowledge is isolated per project. The agent searches across every project **the user can access, in all their workspaces** (`loadUserScope` in `src/lib/ai/server.ts`), merging namespaces by score (`queryNamespaces`). Every project is gated by `memberIds`, so a scoped member can never retrieve another project's knowledge — access spans workspaces, isolation does not leak.
 
 ## The agent loop (`src/lib/ai/agent.ts`)
 
@@ -37,8 +37,9 @@ Thinking is left off for snappy replies; the persona (`persona.ts`) instructs Cl
 | Tool | Does | Side effects |
 |---|---|---|
 | `search_knowledge` | Voyage + Pinecone retrieval | emits a `sources` card |
-| `list_tasks` | filter workspace tasks (status/overdue/due-today) | emits a `task_list` card |
-| `create_task` | write a task via admin | emits a `created_task` card |
+| `list_tasks` | tasks across all the user's workspaces, filterable by project, **assignee**, **parent task (subtasks-of)**, status or time; each row carries its assignee + parent | emits a `task_list` card |
+| `create_task` | write a single task via admin | emits a `created_task` card |
+| `create_tasks` | write many tasks / a nested subtask tree in one call (exact parent-child links) | emits a `task_list` card |
 | `update_task` | fuzzy-match by title, patch via admin | emits an `updated_task` card |
 | `summarize_project` | tasks + top knowledge for the model to summarise | emits sources |
 

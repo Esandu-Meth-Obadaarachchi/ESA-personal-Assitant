@@ -674,10 +674,11 @@ export function watchPresence(uid: string, taskId: string, cb: (p: Presence[]) =
 /* ---------------------------- agent chat history --------------------------- */
 
 /**
- * Live list of a user's saved chats in a workspace. Single-field
- * `array-contains` query (no composite index), filtered + sorted in JS.
+ * Live list of ALL a user's saved chats, across every workspace. Chat history is
+ * global — the user can reopen any past conversation from any workspace. Single-
+ * field `array-contains` query (no composite index), sorted in JS.
  */
-export function watchChats(uid: string, workspaceId: string, cb: (c: Chat[]) => void): Unsubscribe {
+export function watchChats(uid: string, cb: (c: Chat[]) => void): Unsubscribe {
   const q = query(collection(requireDb(), "chats"), where("memberIds", "array-contains", uid));
   return onSnapshot(
     q,
@@ -685,7 +686,6 @@ export function watchChats(uid: string, workspaceId: string, cb: (c: Chat[]) => 
       cb(
         snap.docs
           .map((d) => ({ id: d.id, ...(d.data() as Omit<Chat, "id">) }))
-          .filter((c) => c.workspaceId === workspaceId)
           .sort((a, b) => b.updatedAt - a.updatedAt)
       );
     },

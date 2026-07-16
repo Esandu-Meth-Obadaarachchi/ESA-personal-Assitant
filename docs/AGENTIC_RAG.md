@@ -15,7 +15,7 @@ question
   -> self-check    (Haiku: is every claim supported by the sources?)
 ```
 
-The "allowed project namespaces" are only the projects the requesting user belongs to. `loadWorkspace` (`src/lib/ai/server.ts`) filters by per-project scope before the agent runs, so a scoped member cannot retrieve another project's knowledge.
+The "allowed project namespaces" are every project the requesting user belongs to, **across all their workspaces**. `loadUserScope` (`src/lib/ai/server.ts`) loads them by `memberIds`, so search spans workspaces while a scoped member still cannot retrieve another project's knowledge.
 
 ### Why each step
 

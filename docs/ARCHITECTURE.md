@@ -15,7 +15,7 @@ Browser (client components)
         │ authedFetch (ID token)   │ membership re-checked in code)
         ▼                          │
 Next.js API routes (server, Node runtime)
-  /api/chat    requireUser -> loadWorkspace (per-project scope) -> runAgent (Claude tool loop) ──┘
+  /api/chat    requireUser -> loadUserScope (all workspaces, memberIds-gated) -> runAgent (Claude tool loop) ──┘
   /api/ingest  requireUser -> loadProject -> parse -> chunk -> Voyage -> Pinecone
   /api/related requireUser -> loadProject -> Voyage query + rerank -> Pinecone query
   /api/assign  requireUser -> loadProject (+admin role) -> parse brief -> Claude -> task proposals
@@ -32,7 +32,7 @@ The Firestore client is initialised with **forced long-polling** (`lib/firebase/
 
 **Task edits** never touch an API route. The client writes to Firestore through `useTaskActions` / `lib/data/firestore.ts`; rules enforce access; `onSnapshot` pushes the change back to every view. This keeps the UI instant and offline-friendly.
 
-**Agent chat**: the client posts `{ message, workspaceId, projectId, history }` (only the last 5 turns) with the Firebase ID token. `loadWorkspace` enforces workspace membership **and** per-project scope, so the agent only ever sees projects the user belongs to. The Claude tool-use loop (bounded by `MAX_TOOL_ROUNDS`, output by `MAX_ANSWER_TOKENS`) runs; tool executors read/write tasks via admin and run agentic retrieval over Pinecone. The response carries `{ answer, steps, sources, cards }`, rendered by `components/agent/`. Conversations persist to `chats`/`chatMessages` and reload via the `ChatSidebar`.
+**Agent chat**: the client posts `{ message, workspaceId, projectId, history }` (only the last 5 turns) with the Firebase ID token. `loadUserScope` loads **every workspace and project the user can access, across all workspaces** — each gated by `memberIds`, so per-project scope still holds and nothing they can't access loads. So "my tasks today" and knowledge search span everything, not just the current workspace; `workspaceId`/`projectId` are only the current view (default for new tasks + prompt naming). The Claude tool-use loop (bounded by `MAX_TOOL_ROUNDS`, output by `MAX_ANSWER_TOKENS`) runs; tool executors read/write tasks via admin and run agentic retrieval over Pinecone. The response carries `{ answer, steps, sources, cards }`, rendered by `components/agent/`. Conversations persist to `chats`/`chatMessages` (global across workspaces) and reload via the `ChatSidebar`.
 
 **AI task assignment**: an admin posts a brief (file or text) to `/api/assign`; the route re-checks membership + owner/admin role, parses the brief, gathers the project roster (roles/skills from `project.team`) and each member's current open-task count, then asks Claude for a JSON task list assigned by best-fit and workload. It returns proposals only — the client previews them and writes the approved ones through the normal data layer. See `docs/COLLABORATION.md`.
 

@@ -50,12 +50,23 @@ const boardCollision: CollisionDetection = (args) => {
   return closestCorners(args);
 };
 
-export function KanbanBoard({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
-  const { tasks, currentProject } = useWorkspace();
+export function KanbanBoard({
+  onOpenTask,
+  tasks: tasksProp,
+}: {
+  onOpenTask: (t: Task) => void;
+  /** Cross-project task set (My Tasks). Uses the built-in statuses and hides add UI. */
+  tasks?: Task[];
+}) {
+  const ctx = useWorkspace();
+  const tasks = tasksProp ?? ctx.tasks;
+  const crossProject = tasksProp != null;
+  const currentProject = crossProject ? null : ctx.currentProject;
   const actions = useTaskActions();
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
 
   // Columns = the four built-ins + this project's custom statuses, in order.
+  // Cross-project (My Tasks) uses only the built-ins.
   const statuses = useMemo(() => projectStatuses(currentProject), [currentProject]);
   const statusIds = useMemo(() => statuses.map((s) => s.id), [statuses]);
   const statusKey = statusIds.join(",");
@@ -186,7 +197,7 @@ export function KanbanBoard({ onOpenTask }: { onOpenTask: (t: Task) => void }) {
             ids={cols[meta.id] ?? []}
             byId={byId}
             onOpenTask={onOpenTask}
-            onAdd={(title) => actions.add(title, { status: meta.id })}
+            onAdd={crossProject ? undefined : (title) => actions.add(title, { status: meta.id })}
             onDelete={meta.custom ? () => removeStatus(meta) : undefined}
           />
         ))}
@@ -232,7 +243,8 @@ function Column({
   ids: string[];
   byId: Map<string, Task>;
   onOpenTask: (t: Task) => void;
-  onAdd: (title: string) => void;
+  /** Omitted in cross-project (My Tasks) boards where there is no target project to add to. */
+  onAdd?: (title: string) => void;
   onDelete?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${meta.id}` });
@@ -258,12 +270,14 @@ function Column({
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
-          <button
-            onClick={() => setAdding(true)}
-            className="grid h-5 w-5 place-items-center rounded text-text-faint hover:bg-surface-2 hover:text-text"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
+          {onAdd && (
+            <button
+              onClick={() => setAdding(true)}
+              className="grid h-5 w-5 place-items-center rounded text-text-faint hover:bg-surface-2 hover:text-text"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
       <div
@@ -278,7 +292,7 @@ function Column({
             return t ? <SortableCard key={id} task={t} onOpen={() => onOpenTask(t)} /> : null;
           })}
         </SortableContext>
-        {adding && (
+        {adding && onAdd && (
           <div className="card p-1">
             <QuickAdd
               autoFocus

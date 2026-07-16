@@ -2,6 +2,27 @@
 
 Notable changes, newest first. Product name: **Lune AI**.
 
+## 2026-07-16 — Reliable task trees + assignees/subtasks
+
+### Added
+- **`create_tasks` batch tool.** The agent can build a whole task tree — tasks with nested subtasks — in a single call, with exact parent-child links. This fixes the agent creating top-level tasks but stopping before the subtasks (it used to run out of tool rounds making one `create_task` call per node), and makes deep nesting (identical subtask names under many parents) reliable. Tool-round cap raised 4 → 6 for headroom.
+
+### Fixed
+- **Silent "…" on an over-long request.** When a batch was too big, the model's tool call exceeded the output-token cap (`stop_reason: max_tokens`) and the agent returned an empty answer that rendered as "…". It now detects truncation and says so, telling the user to split into smaller batches, and keeps whatever was already created. Tool-execution errors are surfaced in the action trace and marked `is_error`, and an empty answer falls back to a clear message instead of blank.
+
+### Fixed
+- **The agent could not answer "who is X's tasks" or "subtasks of Y".** `list_tasks` was dropping the assignee and parent-task fields, and had no filter for either. It now returns each task's assignee and parent, and accepts an `assignee` filter and an `under` filter (a parent task's title → its subtasks). The persona prompt tells the agent to use them. The `task_list` card shows the assignee, parent (↳) and subtask count.
+
+### Also
+- The Agent page is mobile-responsive (chat-list drawer, collapsible standup, roomy composer).
+
+## 2026-07-15 — Cross-workspace agent + global chat history
+
+### Changed
+- **The agent now spans every workspace.** `/api/chat` loads `loadUserScope` (all workspaces + projects the user can access, gated by `memberIds`) instead of a single workspace. So "what are my tasks today / assigned to me" returns tasks from every workspace, and knowledge search reaches every accessible project's docs. The current `workspaceId`/`projectId` are now only the default for new tasks and the prompt's naming. Per-project isolation is unchanged — a scoped member still only sees their projects.
+- **Chat history is global.** `watchChats(uid)` no longer filters by workspace, and the Agent page no longer resets the conversation when you switch workspace. Any past chat opens from any workspace.
+- `create_task` writes into the target project's own workspace and `memberIds` (the agent can create in any accessible project, not only the current workspace).
+
 ## 2026-07-15 — Team, statuses, cheaper agent
 
 Shipped to `main` and deployed to https://luneai.site.

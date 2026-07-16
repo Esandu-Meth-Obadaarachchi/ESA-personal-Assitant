@@ -28,7 +28,8 @@ export function TaskRow({
   collapsed: boolean;
   onToggleCollapse: () => void;
   onOpen: () => void;
-  onAddSubtask: () => void;
+  /** Omitted in cross-project views (My Tasks) where there is no single target project. */
+  onAddSubtask?: () => void;
   selected?: boolean;
 }) {
   const { tasks } = useWorkspace();
@@ -108,13 +109,15 @@ export function TaskRow({
 
         {/* hover actions */}
         <div className="flex items-center opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            onClick={onAddSubtask}
-            title="Add subtask"
-            className="grid h-6 w-6 place-items-center rounded-md text-text-faint hover:bg-surface-3 hover:text-text"
-          >
-            <CornerDownRight className="h-3.5 w-3.5" />
-          </button>
+          {onAddSubtask && (
+            <button
+              onClick={onAddSubtask}
+              title="Add subtask"
+              className="grid h-6 w-6 place-items-center rounded-md text-text-faint hover:bg-surface-3 hover:text-text"
+            >
+              <CornerDownRight className="h-3.5 w-3.5" />
+            </button>
+          )}
           <Dropdown
             align="right"
             width={168}
@@ -126,15 +129,17 @@ export function TaskRow({
           >
             {(close) => (
               <div>
-                <MenuItem
-                  icon={<CornerDownRight className="h-4 w-4" />}
-                  onClick={() => {
-                    onAddSubtask();
-                    close();
-                  }}
-                >
-                  Add subtask
-                </MenuItem>
+                {onAddSubtask && (
+                  <MenuItem
+                    icon={<CornerDownRight className="h-4 w-4" />}
+                    onClick={() => {
+                      onAddSubtask();
+                      close();
+                    }}
+                  >
+                    Add subtask
+                  </MenuItem>
+                )}
                 <MenuItem onClick={() => { onOpen(); close(); }}>Open details</MenuItem>
                 <div className="my-1 h-px bg-border" />
                 <MenuItem

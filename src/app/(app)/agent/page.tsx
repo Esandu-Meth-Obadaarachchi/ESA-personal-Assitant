@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUp, ListTodo, Plus, Sun } from "lucide-react";
+import { ArrowUp, ChevronDown, ListTodo, MessagesSquare, Plus, Sparkles, Sun } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import {
@@ -40,8 +40,16 @@ export default function AgentPage() {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [chatListOpen, setChatListOpen] = useState(false);
+  const [standupOpen, setStandupOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Standup starts collapsed on small screens so the composer and messages get
+  // the room; expanded on desktop where there's space.
+  useEffect(() => {
+    setStandupOpen(window.innerWidth >= 1024);
+  }, []);
 
   // Grow the composer with the text, up to a cap, then let it scroll.
   useEffect(() => {
@@ -56,17 +64,12 @@ export default function AgentPage() {
     return watchAllTasks(user.uid, setAllTasks);
   }, [user]);
 
-  // Live list of this user's saved chats in the current workspace.
+  // Live list of ALL this user's saved chats — global across workspaces, so the
+  // conversation stays open when the user switches workspace.
   useEffect(() => {
-    if (!user || !currentWorkspace) return;
-    return watchChats(user.uid, currentWorkspace.id, setChats);
-  }, [user, currentWorkspace]);
-
-  // Switching workspace starts a fresh conversation.
-  useEffect(() => {
-    setCurrentChatId(null);
-    setMessages([]);
-  }, [currentWorkspace?.id]);
+    if (!user) return;
+    return watchChats(user.uid, setChats);
+  }, [user]);
 
   const wsTasks = useMemo(
     () => (currentWorkspace ? allTasks.filter((t) => t.workspaceId === currentWorkspace.id) : allTasks),
@@ -74,6 +77,7 @@ export default function AgentPage() {
   );
   const digest = useMemo(() => computeDigest(wsTasks), [wsTasks]);
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name;
+  const needAttention = digest.overdue.length + digest.dueToday.length + digest.blocked.length;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -163,8 +167,9 @@ export default function AgentPage() {
                 ...m,
                 pending: false,
                 content:
-                  "I couldn't reach the model. Check that `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY` and the Firebase Admin keys are set.\n\n> " +
-                  (e instanceof Error ? e.message : String(e)),
+                  "⚠️ Something went wrong reaching the agent.\n\n> " +
+                  (e instanceof Error ? e.message : String(e)) +
+                  "\n\nIf this keeps happening, check the API keys are set, or try a smaller request.",
               }
             : m
         )
@@ -182,22 +187,55 @@ export default function AgentPage() {
         onSelect={openChat}
         onNew={startNewChat}
         onDelete={removeChat}
+        open={chatListOpen}
+        onClose={() => setChatListOpen(false)}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <header className="flex items-center gap-2 border-b border-border px-3 py-3 sm:px-4">
+          <button
+            onClick={() => setChatListOpen(true)}
+            aria-label="Chat history"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text lg:hidden"
+          >
+            <MessagesSquare className="h-5 w-5" />
+          </button>
           <h1 className="text-[15px] font-semibold tracking-tight">Agent</h1>
-          <span className="text-2xs text-text-faint">· {currentWorkspace?.name}</span>
+          <span className="min-w-0 truncate text-2xs text-text-faint">· {currentWorkspace?.name}</span>
         </header>
 
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-2xl px-4 py-5">
-            <StandupCard
-              digest={digest}
-              userName={user?.displayName ?? "there"}
-              projectName={projectName}
-              onOpen={openTask}
-            />
+          <div className="mx-auto max-w-2xl px-3 py-4 sm:px-4 sm:py-5">
+            {standupOpen ? (
+              <div>
+                <div className="mb-1 flex justify-end">
+                  <button
+                    onClick={() => setStandupOpen(false)}
+                    className="text-2xs text-text-faint transition-colors hover:text-text-muted"
+                  >
+                    Hide standup
+                  </button>
+                </div>
+                <StandupCard
+                  digest={digest}
+                  userName={user?.displayName ?? "there"}
+                  projectName={projectName}
+                  onOpen={openTask}
+                />
+              </div>
+            ) : (
+              <button
+                onClick={() => setStandupOpen(true)}
+                className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2 text-[13px] text-text-muted transition-colors hover:border-border-strong hover:text-text"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-accent" />
+                Today&apos;s standup
+                {needAttention > 0 && (
+                  <span className="text-2xs text-text-faint">· {needAttention} need attention</span>
+                )}
+                <ChevronDown className="ml-auto h-3.5 w-3.5" />
+              </button>
+            )}
 
             {messages.length === 0 ? (
               <div className="mt-6 text-center text-[13px] text-text-muted">
@@ -214,7 +252,7 @@ export default function AgentPage() {
         </div>
 
         {/* Composer */}
-        <div className="border-t border-border px-4 py-3">
+        <div className="border-t border-border px-3 py-3 sm:px-4">
           <div className="mx-auto max-w-2xl">
             <div className="mb-2 flex flex-wrap gap-1.5">
               {CHIPS.map((c) => (
