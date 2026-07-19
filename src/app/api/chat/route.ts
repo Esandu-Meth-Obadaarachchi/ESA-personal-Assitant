@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/firebase/admin";
 import { loadUserScope } from "@/lib/ai/server";
 import { runAgent, type AgentTurn } from "@/lib/ai/agent";
+import { withUsage } from "@/lib/ai/usage";
 import type { ToolContext } from "@/lib/ai/tools";
 import { MAX_CHAT_INPUT_CHARS } from "@/lib/constants";
 
@@ -61,11 +62,17 @@ export async function POST(req: Request) {
       .map(([ws, names]) => `${ws}:\n${names.map((n) => `  - ${n}`).join("\n")}`)
       .join("\n");
 
-    const result = await runAgent(message.slice(0, MAX_CHAT_INPUT_CHARS), history ?? [], ctx, {
-      workspaceName: workspaces.find((w) => w.id === workspaceId)?.name ?? "your workspaces",
-      projectName: projects.find((p) => p.id === projectId)?.name,
-      projectList,
-    });
+    // Attribute every Claude call in this request (agent loop + retrieval helpers)
+    // to the signed-in user, so the admin dashboard can total their spend.
+    const result = await withUsage(
+      { uid: user.uid, email: user.email, name: user.name },
+      () =>
+        runAgent(message.slice(0, MAX_CHAT_INPUT_CHARS), history ?? [], ctx, {
+          workspaceName: workspaces.find((w) => w.id === workspaceId)?.name ?? "your workspaces",
+          projectName: projects.find((p) => p.id === projectId)?.name,
+          projectList,
+        })
+    );
 
     return NextResponse.json(result);
   } catch (err) {

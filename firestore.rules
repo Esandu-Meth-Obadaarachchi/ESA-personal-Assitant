@@ -87,5 +87,11 @@ service cloud.firestore {
     match /invites/{id} {
       allow read, write: if false;
     }
+
+    // Per-user Claude usage totals, written by the Admin SDK (lib/ai/usage.ts) and
+    // read only by the admin dashboard route. Never touched from the client.
+    match /usage/{id} {
+      allow read, write: if false;
+    }
   }
 }

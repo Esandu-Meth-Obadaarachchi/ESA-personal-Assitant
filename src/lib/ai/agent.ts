@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropic, CLAUDE_MODEL } from "./anthropic";
+import { recordUsage } from "./usage";
 import { buildAgentSystem } from "./persona";
 import { checkGrounded } from "./retrieval";
 import { TOOLS, executeTool, type ToolContext } from "./tools";
@@ -61,6 +62,7 @@ export async function runAgent(
       tools: TOOLS,
       messages,
     });
+    recordUsage(CLAUDE_MODEL, resp.usage);
 
     // The model was cut off mid-response — almost always a create_tasks call too
     // big for one turn's token budget. A truncated tool call cannot be executed,
