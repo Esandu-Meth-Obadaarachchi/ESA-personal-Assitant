@@ -5,7 +5,7 @@
 **An AI-native project + knowledge manager. Notion-meets-Linear, powered by Claude.**
 
 Projects · tasks · docs · a knowledge base, and a Claude agent that reasons across all of it.
-Live at **https://esa-ai-personal-assistant.netlify.app** (codebase name: `second-brain`).
+Live at **https://luneai.site** (codebase name: `second-brain`).
 
 </div>
 
