@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { wrapAnthropic } from "langsmith/wrappers/anthropic";
+import { recordUsage } from "./usage";
 
 /**
  * The agent + RAG generation model. Set via the CLAUDE_MODEL env var so it can be
@@ -39,12 +40,14 @@ export async function complete(
   prompt: string,
   opts: { system?: string; maxTokens?: number; model?: string } = {}
 ): Promise<string> {
+  const model = opts.model ?? CLAUDE_FAST_MODEL;
   const resp = await anthropic().messages.create({
-    model: opts.model ?? CLAUDE_FAST_MODEL,
+    model,
     max_tokens: opts.maxTokens ?? 256,
     system: opts.system,
     messages: [{ role: "user", content: prompt }],
   });
+  recordUsage(model, resp.usage);
   return resp.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)

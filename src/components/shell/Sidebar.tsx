@@ -16,11 +16,13 @@ import {
   Moon,
   PanelLeftClose,
   Plus,
+  ShieldAlert,
   Sparkles,
   Sun,
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { isAdminEmail } from "@/lib/admin";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { createPage, createProject, createTask, deleteProjectDeep } from "@/lib/data/firestore";
 import type { Project } from "@/lib/types";
@@ -383,6 +385,20 @@ export function Sidebar({
               >
                 {theme === "dark" ? "Light mode" : "Dark mode"}
               </MenuItem>
+              {isAdminEmail(user?.email) && (
+                <>
+                  <div className="my-1 h-px bg-border" />
+                  <MenuItem
+                    icon={<ShieldAlert className="h-4 w-4" />}
+                    onClick={() => {
+                      window.open("/admin", "_blank", "noopener");
+                      close();
+                    }}
+                  >
+                    Oversight terminal
+                  </MenuItem>
+                </>
+              )}
               <div className="my-1 h-px bg-border" />
               <MenuItem danger icon={<LogOut className="h-4 w-4" />} onClick={() => signOutUser()}>
                 Sign out
