@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb, requireUser } from "@/lib/firebase/admin";
 import { loadProject, loadWorkspace } from "@/lib/ai/server";
 import { anthropic, CLAUDE_MODEL } from "@/lib/ai/anthropic";
+import { recordUsage, withUsage } from "@/lib/ai/usage";
 import { parseFile } from "@/lib/ai/parse";
 import { MAX_BRIEF_CHARS } from "@/lib/constants";
 import type Anthropic from "@anthropic-ai/sdk";
@@ -120,11 +121,18 @@ Return ONLY a JSON array, no prose, no code fences. Each item:
 
 Rules: assigneeUid MUST be one of the listed uids. Keep titles under 80 characters. Produce at most 25 tasks.`;
 
-    const resp = await anthropic().messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 2500,
-      messages: [{ role: "user", content: prompt }],
-    });
+    const resp = await withUsage(
+      { uid: user.uid, email: user.email, name: user.name },
+      async () => {
+        const r = await anthropic().messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 2500,
+          messages: [{ role: "user", content: prompt }],
+        });
+        recordUsage(CLAUDE_MODEL, r.usage);
+        return r;
+      }
+    );
     const raw = resp.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)

@@ -41,7 +41,8 @@ Model + RAG rationale: `docs/RAG.md` and `docs/AGENTIC_RAG.md`. Data model: `doc
 - **Production:** https://luneai.site (Netlify site `esa-ai-personal-assistant`, team `eobadaarachchi`/"Shona"; the `*.netlify.app` subdomain still resolves). Deploy manually with `netlify deploy --build --prod`. Env vars live on the Netlify site (imported from `.env.local`, with the URL-based ones repointed to the prod domain). Set `CLAUDE_MODEL` there to change the generation model (default Haiku).
 - **Firebase project:** `second-brain-fbf414` (owner `eobadaarachchi@gmail.com`), pinned in `.firebaserc`.
 - **Auth:** Google sign-in enabled. Authorised domains include `localhost`, `esa-ai-personal-assistant.netlify.app` and `luneai.site`. On first login a signed-in user is seeded with a single **Test it out** sandbox workspace holding two demo projects.
-- **Firestore:** `asia-south1`. **Rules must be redeployed after any change** (`firebase deploy --only firestore:rules`) — hosting on Netlify does not touch them. New collections (`dayPlans`, `whiteboards`, `pages`, `chats`, `chatMessages`) will 403 until the rules are live.
+- **Firestore:** `asia-south1`. **Rules must be redeployed after any change** (`firebase deploy --only firestore:rules`) — hosting on Netlify does not touch them. New collections (`dayPlans`, `whiteboards`, `pages`, `chats`, `chatMessages`, `usage`) will 403 until the rules are live.
+- **Admin oversight (`/admin`):** owner-only Batcomputer dashboard — user list, workspace counts and per-user Claude spend. Gated to the emails in `lib/admin.ts` (`ADMIN_EMAILS`). Spend is tracked by `lib/ai/usage.ts`: every Claude call inside `/api/chat` and `/api/assign` runs in a `withUsage(user, …)` scope, and `recordUsage` folds token counts + USD cost into `usage/{uid}` (server-only collection). There is **no historical backfill** — figures accumulate from first deploy of the tracking. Pricing table in `usage.ts` (keyed by model; update if `CLAUDE_MODEL` changes tier).
 - **Admin SDK:** service-account key set in `.env.local` + Netlify — powers `requireUser`, agent writes and all sharing writes.
 - **AI keys:** `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `PINECONE_API_KEY` are configured. If ever blank, everything except `/api/chat`, `/api/ingest`, `/api/related`, `/api/assign` still works.
 
@@ -68,6 +69,8 @@ src/
     api/members/route.ts       Sharing: list/invite/accept/update/remove (POST/GET).
                                NB named /api/members, NOT /api/share — ad-blockers block "share" URLs.
     api/calendar/*             Google Calendar OAuth + two-way sync
+    api/admin/stats/route.ts   Owner-only telemetry: users + workspaces + Claude spend (GET, admin-gated)
+    admin/page.tsx             Batcomputer oversight dashboard (outside the (app) shell; owner email only)
   components/
     ui/        Design-system primitives (Button, Avatar, Dropdown, Modal, chips, StatusControl...).
                Dropdown renders in a body portal (fixed, viewport-clamped, flips up).
