@@ -285,8 +285,10 @@ export interface AgentCard {
 export interface NavigateCardData {
   route: string;
   label: string;
-  /** Set when the destination is a project — select it before pushing "/". */
+  /** Set when the destination is a project — select it before pushing the route. */
   projectId?: string;
+  /** Set when the destination is a workspace — select it before pushing the route. */
+  workspaceId?: string;
 }
 
 export interface ChatMessage {

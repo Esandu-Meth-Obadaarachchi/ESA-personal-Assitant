@@ -46,6 +46,7 @@ export async function POST(req: Request) {
         workspaceId: p.workspaceId,
         memberIds: p.memberIds ?? [],
       })),
+      workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
       sources: [],
       cards: [],
       steps: [],

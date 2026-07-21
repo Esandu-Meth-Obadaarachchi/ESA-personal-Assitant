@@ -83,6 +83,20 @@ missed wake word makes the feature feel broken, so the trade leans permissive.
 key, and `NAV_ROUTES` in `lib/ai/tools.ts` maps it to a path. The model cannot emit
 an arbitrary URL for the client to push.
 
+**Opening a project means switching workspace first.** `selectProject` only looks
+inside the *current* workspace's projects, so a project id from another workspace
+resolves to null and nothing happens. The navigate card therefore carries the
+project's `workspaceId`, and `useNavSelection` routes cross-workspace jumps through
+`openWorkspaceProject` (which stashes the project, switches workspace, and selects
+it once that workspace's projects load). Within the current workspace that same call
+would *clear* the selection — the workspace id does not change, so nothing re-runs to
+restore it — hence the branch. Both voice and the agent chat card share that hook so
+the rule cannot drift between them.
+
+**Names are matched leniently, because speech splits them.** `matchByName` tries
+exact, then substring, then a comparison with spaces and punctuation stripped —
+"power prox" has to find "PowerProx". It backs both project and workspace lookup.
+
 **Spoken answers are shortened at the prompt, not after the fact.** `voice: true`
 appends a rule to the persona asking for under 40 words in plain prose. `speakable()`
 is only a backstop — it strips markdown and caps length, because Chrome's synthesis
@@ -130,7 +144,8 @@ Things that work today:
 
 - "Hey Lune, what's overdue?"
 - "Hey Lune, go to today" / "open knowledge" / "take me to all my tasks"
-- "Hey Lune, open the Website project"
+- "Hey Lune, open the Website project" (works across workspaces, not just the open one)
+- "Hey Lune, switch to the SLT workspace"
 - "Hey Lune, add a task to call the supplier on Friday"
 - "Hey Lune, what did we decide about pricing?" (searches the knowledge base)
 
@@ -145,7 +160,10 @@ src/components/shell/VoiceOrb.tsx  The floating control and status bubble
 src/components/shell/AppFrame.tsx  Mounts the provider + control app-wide
 src/lib/ai/tools.ts            navigate_to tool + NAV_ROUTES
 src/lib/ai/persona.ts          The voice-mode brevity rules
+src/lib/data/useNavSelection.ts    Applies a navigate card's workspace/project selection
 ```
 
 Adding a screen to voice navigation is one line in `NAV_ROUTES` — the enum in the
 tool schema is derived from its keys, so the model picks it up automatically.
+(`project` and `workspace` are separate destinations handled outside that map,
+since they resolve a name rather than a fixed path.)

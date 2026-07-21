@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
+import { useNavSelection } from "@/lib/data/useNavSelection";
 import { postJSON } from "@/lib/api";
 import type { AgentCard, NavigateCardData } from "@/lib/types";
 import {
@@ -60,7 +61,8 @@ const MAX_HISTORY = 6;
 
 export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { currentWorkspace, currentProject, selectProject } = useWorkspace();
+  const { currentWorkspace, currentProject } = useWorkspace();
+  const applyNavSelection = useNavSelection();
 
   const [supported, setSupported] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -187,7 +189,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         // time the user hears "opening Today".
         const nav = res.cards?.find((c) => c.kind === "navigate")?.data as NavigateCardData | undefined;
         if (nav) {
-          if (nav.projectId) selectProject(nav.projectId);
+          applyNavSelection(nav);
           router.push(nav.route);
         }
       } catch (e) {
@@ -201,7 +203,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       await speak(speakable(answer));
       backToListening();
     },
-    [clearTimers, router, selectProject, setPhaseBoth, startRec, stopRec]
+    [applyNavSelection, clearTimers, router, setPhaseBoth, startRec, stopRec]
   );
   const runCommandRef = useRef(runCommand);
   useEffect(() => {
