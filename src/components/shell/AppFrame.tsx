@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, PanelLeftOpen } from "lucide-react";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
+import { VoiceProvider } from "@/lib/voice/VoiceContext";
 import { Logo } from "@/components/ui/Logo";
 import { Sidebar } from "./Sidebar";
+import { VoiceOrb } from "./VoiceOrb";
 
 export function AppFrame({ children }: { children: React.ReactNode }) {
   const { seeding, currentWorkspace } = useWorkspace();
@@ -30,6 +32,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   return (
+    <VoiceProvider>
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-bg lg:flex-row">
       {/* Mobile top bar */}
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3 lg:hidden">
@@ -75,6 +78,8 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
 
       <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
 
+      <VoiceOrb />
+
       {seeding && (
         <div className="fixed inset-0 z-[200] grid place-items-center bg-bg/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-4 animate-fade-in">
@@ -89,5 +94,6 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
         </div>
       )}
     </div>
+    </VoiceProvider>
   );
 }

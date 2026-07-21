@@ -8,7 +8,7 @@ Shipped as **Lune AI — Your Personal Workspace** (product name; the codebase/p
 
 1. **Execution** — Workspace -> Project -> Task -> Subtask (recursive). Nine per-project tabs: Tree, Board (Kanban), List, Calendar, Map (React Flow mind map), Draw (Excalidraw whiteboard), Docs (project pages), **Members** (Kanban grouped by assignee, drag to reassign) and **Team** (per-project member roles/skills + AI task assignment). List/Board only ever show top-level tasks with subtasks nested underneath. The Board supports **per-project custom statuses** on top of the four built-ins.
 2. **Knowledge** — per-project RAG. Upload docs, they are chunked, embedded (Voyage) and stored in Pinecone.
-3. **Agent** — a Claude tool-calling agent ("the brain") that reads and writes tasks and searches knowledge. Conversations are saved to Firestore (chat history sidebar). Plus a daily standup.
+3. **Agent** — a Claude tool-calling agent ("the brain") that reads and writes tasks, searches knowledge and navigates the app. Conversations are saved to Firestore (chat history sidebar). Plus a daily standup. Reachable by **voice** ("Hey Lune") from any screen — see `docs/VOICE.md`.
 4. **Today** (`/today`) — every task due on the focused day across *all* workspaces, plus a per-user day planner (notebook) synced to Firestore. A day picker (prev/next + back-to-today) drives the task list, stats, export and the notebook together; overdue only shows when the focused day is today. Tasks assigned to the current user float to the top of each group.
 5. **Pages** — Notion-style block documents (BlockNote) at workspace or project level, nestable into a page tree.
 6. **Sharing + team** — invite teammates by email with owner/admin/member/viewer roles, scoped to the whole workspace or specific projects. Admins set each member's role/skills per project (Team tab) and can turn a brief or doc into an assigned task list with AI (`/api/assign`). See `docs/COLLABORATION.md`.
@@ -30,11 +30,12 @@ Full product intent is in `second-brain-app-spec.md` and `second-brain-design-br
 | Mind map | reactflow (v11) | Map view — auto-laid-out task tree |
 | Whiteboard | @excalidraw/excalidraw | Draw view — one scene per project, saved to Firestore |
 | Pages editor | BlockNote (`@blocknote/*` v0.31, React-18 compatible) | Notion-style block editor; loaded via `ssr:false` dynamic import |
+| Voice | Browser Web Speech APIs (recognition + synthesis) | Zero-cost and dependency-free. Chrome/Edge only; the control hides itself where unsupported |
 | Hosting | Netlify (`@netlify/plugin-nextjs`) | manual deploys, no CI/CD yet |
 
 `reactStrictMode` is **off** in `next.config.js` on purpose — StrictMode's dev double-mount rapidly re-subscribes Firestore listeners and trips the same WebChannel assertion.
 
-Model + RAG rationale: `docs/RAG.md` and `docs/AGENTIC_RAG.md`. Data model: `docs/DATA_MODEL.md`. Team roles, AI assignment, Members board + custom statuses: `docs/COLLABORATION.md`. Visual system: `docs/DESIGN_SYSTEM.md`. Architecture: `docs/ARCHITECTURE.md`. Setup: `docs/SETUP.md`. Google Calendar sync: `docs/CALENDAR.md`. Deployment: `docs/DEPLOYMENT.md`. Roadmap + phase status: `docs/ROADMAP.md`. Recent changes: `docs/CHANGELOG.md`.
+Model + RAG rationale: `docs/RAG.md` and `docs/AGENTIC_RAG.md`. Data model: `docs/DATA_MODEL.md`. Team roles, AI assignment, Members board + custom statuses: `docs/COLLABORATION.md`. Visual system: `docs/DESIGN_SYSTEM.md`. Architecture: `docs/ARCHITECTURE.md`. Setup: `docs/SETUP.md`. Google Calendar sync: `docs/CALENDAR.md`. Voice ("Hey Lune"): `docs/VOICE.md`. Deployment: `docs/DEPLOYMENT.md`. Roadmap + phase status: `docs/ROADMAP.md`. Recent changes: `docs/CHANGELOG.md`.
 
 ## Live instance (provisioned + deployed)
 
@@ -74,7 +75,7 @@ src/
   components/
     ui/        Design-system primitives (Button, Avatar, Dropdown, Modal, chips, StatusControl...).
                Dropdown renders in a body portal (fixed, viewport-clamped, flips up).
-    shell/     Sidebar (collapsible), WorkspaceSwitcher, AppFrame, ShareDialog
+    shell/     Sidebar (collapsible), WorkspaceSwitcher, AppFrame, ShareDialog, VoiceOrb
     task/      TaskRow, TaskCard, TaskDrawer, Pickers, TimeTracker
     views/     TreeView, KanbanBoard, ListView, CalendarView, DayDetail,
                MindMapView (React Flow), WhiteboardView (Excalidraw), MemberBoard (Kanban by assignee)
@@ -90,6 +91,7 @@ src/
     share/     server.ts (admin-side membership: invites, roles, per-project scope, recompute)
     ai/        voyage, pinecone, anthropic, chunker, parse, persona, tools, agent, retrieval, server
     google/    calendar.ts, store.ts, sync.ts
+    voice/     speech.ts (Web Speech wrappers), VoiceContext.tsx ("Hey Lune" state machine)
     types.ts, constants.ts, date.ts, utils.ts, api.ts, export.ts
 firestore.rules / firestore.indexes.json / firebase.json / netlify.toml
 ```
@@ -112,6 +114,7 @@ firestore.rules / firestore.indexes.json / firebase.json / netlify.toml
 - `search_knowledge` — Voyage-embed the query, agentic retrieve + rerank across every accessible project namespace (all workspaces)
 - `list_tasks`, `create_task`, `update_task` — read/write Firestore via admin; `list_tasks` spans all the user's workspaces, so "my tasks today" is global. `create_task` writes into the target project's own workspace + `memberIds`
 - `summarize_project` — tasks + top knowledge chunks
+- `navigate_to` — move the user to a screen. Returns a `navigate` card; the client pushes the route. The model picks an enum key, the **server** maps it to a path via `NAV_ROUTES` — never a model-supplied URL
 
 The request's `workspaceId`/`projectId` are only the current view — used to default new tasks and name the current workspace in the prompt, not to limit scope. Cost caps live in `agent.ts` (`MAX_ANSWER_TOKENS` 1024, `MAX_TOOL_ROUNDS` 4) and only the last 5 turns are sent to the model; the full conversation is persisted in Firestore (`chats` + `chatMessages`, personal to the user and **global across workspaces** — the sidebar shows every past chat regardless of which workspace is active). Tool executors accumulate `sources`, `cards` and `steps` on the `ToolContext`; these are returned to the UI and rendered by `components/agent/cards.tsx`. Thinking is left off for latency; the persona prompt (`src/lib/ai/persona.ts`) keeps reasoning out of the visible answer. Retrieval quality (rewrite -> rerank -> grade-and-retry -> grounded self-check) is in `src/lib/ai/retrieval.ts` — see `docs/AGENTIC_RAG.md`.
 
@@ -138,7 +141,8 @@ npm run lint       # next lint
 | Task | Start in |
 |---|---|
 | A new task field | `lib/types.ts` -> `firestore.ts` + `useTaskActions` -> the task views + `TaskDrawer` |
-| A new agent tool | `lib/ai/tools.ts` (schema + executor) -> it is auto-wired into the loop |
+| A new agent tool | `lib/ai/tools.ts` (schema + executor) -> it is auto-wired into the loop, and reachable by voice |
+| A new voice-navigable screen | add a key to `NAV_ROUTES` in `lib/ai/tools.ts` — the tool enum derives from it. See `docs/VOICE.md` |
 | A new project view/tab | `components/views/` (or `project/`) -> add a `ViewTab` in `project/ProjectHeader.tsx` + a branch in `app/(app)/page.tsx` |
 | Task statuses / custom statuses | `constants.ts` (`projectStatuses`, `statusMeta`), `KanbanBoard`/`ListView`, `useProjectStatuses`. See `docs/COLLABORATION.md` |
 | Team roles / AI assignment | `components/project/TeamView.tsx` + `api/assign/route.ts` (server, admin-gated) |

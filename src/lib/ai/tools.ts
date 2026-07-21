@@ -21,6 +21,8 @@ export interface ToolContext {
   currentProjectId?: string;
   /** Every project the user can access, across ALL their workspaces. */
   projects: ProjectRef[];
+  /** Every workspace the user can access — used to navigate between them by name. */
+  workspaces: { id: string; name: string }[];
   // artifacts accumulated during a run, surfaced back to the UI
   sources: RetrievedChunk[];
   cards: AgentCard[];
@@ -35,6 +37,19 @@ interface TaskNodeInput {
   due_date?: string;
   subtasks?: TaskNodeInput[];
 }
+
+/** The screens `navigate_to` may open, keyed by the enum value the model picks.
+ *  Routes are never taken from model output — the model chooses a key, the server
+ *  maps it to a path. Keep in step with the nav in `components/shell/Sidebar.tsx`. */
+const NAV_ROUTES: Record<string, { route: string; label: string }> = {
+  today: { route: "/today", label: "Today" },
+  overview: { route: "/overview", label: "Workspace overview" },
+  workspaces: { route: "/workspaces", label: "All workspaces" },
+  my_tasks: { route: "/my-tasks", label: "All my tasks" },
+  pages: { route: "/pages", label: "Pages" },
+  knowledge: { route: "/knowledge", label: "Knowledge" },
+  agent: { route: "/agent", label: "Agent" },
+};
 
 /** Tool schemas advertised to Claude. */
 export const TOOLS: Anthropic.Tool[] = [
@@ -144,6 +159,31 @@ export const TOOLS: Anthropic.Tool[] = [
       properties: { project: { type: "string" } },
     },
   },
+  {
+    name: "navigate_to",
+    description:
+      "Move the user to a screen in the app. THIS TOOL IS THE ONLY THING THAT CHANGES THE SCREEN — writing 'opening X' in your reply does nothing on its own. Call it whenever the user says 'go to…', 'open…', 'take me to…', 'show me the… page', or names a project or workspace they want to look at. Call it BEFORE you reply, then confirm in one short line. Only for navigating the UI — to ANSWER a question about tasks or documents use list_tasks or search_knowledge instead.",
+    input_schema: {
+      type: "object",
+      properties: {
+        destination: {
+          type: "string",
+          enum: [...Object.keys(NAV_ROUTES), "project", "workspace"],
+          description:
+            "Which screen to open. Use \"project\" with `project` to open one project's board, or \"workspace\" with `workspace` to switch to a whole workspace. To open a project inside a named workspace, just use \"project\" — project names are unique enough to find on their own.",
+        },
+        project: {
+          type: "string",
+          description: "Project name — required when destination is \"project\".",
+        },
+        workspace: {
+          type: "string",
+          description: "Workspace name — required when destination is \"workspace\".",
+        },
+      },
+      required: ["destination"],
+    },
+  },
 ];
 
 /* --------------------------------- helpers --------------------------------- */
@@ -158,10 +198,32 @@ function resolveProject(ctx: ToolContext, name?: string): ProjectRef | undefined
       ctx.projects[0]
     );
   }
+  return matchByName(ctx.projects, name);
+}
+
+/** Find a workspace by name. Same tolerant matching as projects. */
+function resolveWorkspace(ctx: ToolContext, name?: string) {
+  if (!name) return ctx.workspaces.find((w) => w.id === ctx.currentWorkspaceId);
+  return matchByName(ctx.workspaces, name);
+}
+
+/**
+ * Match a named thing, most-exact first: exact -> substring -> punctuation-and-
+ * space-stripped. The last tier exists for speech: recognition splits compound
+ * names into words ("PowerProx" -> "power prox"), which defeats plain substring
+ * matching, so squashing both sides rescues the match.
+ */
+function matchByName<T extends { name: string }>(items: T[], name: string): T | undefined {
   const n = name.toLowerCase();
+  const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const sq = squash(name);
   return (
-    ctx.projects.find((p) => p.name.toLowerCase() === n) ??
-    ctx.projects.find((p) => p.name.toLowerCase().includes(n) || n.includes(p.name.toLowerCase()))
+    items.find((i) => i.name.toLowerCase() === n) ??
+    items.find((i) => i.name.toLowerCase().includes(n) || n.includes(i.name.toLowerCase())) ??
+    (sq
+      ? items.find((i) => squash(i.name) === sq) ??
+        items.find((i) => squash(i.name).includes(sq) || sq.includes(squash(i.name)))
+      : undefined)
   );
 }
 
@@ -407,6 +469,45 @@ export async function executeTool(
         tasks,
         knowledge: chunks.map((c) => ({ source: c.source, text: c.text.slice(0, 500) })),
       });
+    }
+
+    case "navigate_to": {
+      const dest = String(input.destination ?? "");
+      if (dest === "project") {
+        const target = resolveProject(ctx, input.project ? String(input.project) : undefined);
+        if (!target) return `No project found matching "${input.project ?? ""}".`;
+        // Carry the owning workspace too: the project may live in a workspace the
+        // user is not currently in, and the client has to switch to it before the
+        // project id means anything.
+        ctx.cards.push({
+          kind: "navigate",
+          data: {
+            route: "/",
+            label: target.name,
+            projectId: target.id,
+            workspaceId: target.workspaceId,
+          },
+        });
+        return `Opening the ${target.name} project.`;
+      }
+      if (dest === "workspace") {
+        const target = resolveWorkspace(ctx, input.workspace ? String(input.workspace) : undefined);
+        if (!target) {
+          return `No workspace found matching "${input.workspace ?? ""}". Available: ${ctx.workspaces
+            .map((w) => w.name)
+            .join(", ")}.`;
+        }
+        // Land on the workspace's own dashboard, not the all-workspaces index.
+        ctx.cards.push({
+          kind: "navigate",
+          data: { route: "/overview", label: target.name, workspaceId: target.id },
+        });
+        return `Switched to the ${target.name} workspace.`;
+      }
+      const known = NAV_ROUTES[dest];
+      if (!known) return `"${dest}" is not a screen in this app.`;
+      ctx.cards.push({ kind: "navigate", data: known });
+      return `Opening ${known.label}.`;
     }
 
     default:

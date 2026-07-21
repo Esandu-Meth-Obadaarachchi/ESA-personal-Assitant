@@ -19,11 +19,12 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { message, workspaceId, projectId, history } = (await req.json()) as {
+    const { message, workspaceId, projectId, history, voice } = (await req.json()) as {
       message?: string;
       workspaceId?: string;
       projectId?: string;
       history?: AgentTurn[];
+      voice?: boolean;
     };
     if (!message) {
       return NextResponse.json({ error: "message is required" }, { status: 400 });
@@ -46,6 +47,7 @@ export async function POST(req: Request) {
         workspaceId: p.workspaceId,
         memberIds: p.memberIds ?? [],
       })),
+      workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
       sources: [],
       cards: [],
       steps: [],
@@ -63,7 +65,8 @@ export async function POST(req: Request) {
       .join("\n");
 
     // Attribute every Claude call in this request (agent loop + retrieval helpers)
-    // to the signed-in user, so the admin dashboard can total their spend.
+    // to the signed-in user, so the admin dashboard can total their spend. Voice
+    // commands run through the same path, so they are counted too.
     const result = await withUsage(
       { uid: user.uid, email: user.email, name: user.name },
       () =>
@@ -71,6 +74,7 @@ export async function POST(req: Request) {
           workspaceName: workspaces.find((w) => w.id === workspaceId)?.name ?? "your workspaces",
           projectName: projects.find((p) => p.id === projectId)?.name,
           projectList,
+          voice: !!voice,
         })
     );
 

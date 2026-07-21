@@ -1,7 +1,9 @@
 "use client";
 
-import { CheckCircle2, FileText, ListChecks, PencilLine } from "lucide-react";
-import type { AgentCard, RetrievedChunk } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { ArrowRight, CheckCircle2, FileText, ListChecks, PencilLine } from "lucide-react";
+import type { AgentCard, NavigateCardData, RetrievedChunk } from "@/lib/types";
+import { useNavSelection } from "@/lib/data/useNavSelection";
 import { statusMeta } from "@/lib/constants";
 import { DueDateChip } from "@/components/ui/DueDateChip";
 import { PriorityDot } from "@/components/ui/PriorityIndicator";
@@ -41,9 +43,35 @@ function CardView({ card }: { card: AgentCard }) {
       return <TaskList data={card.data as TaskLike[]} />;
     case "sources":
       return <Sources data={card.data as RetrievedChunk[]} />;
+    case "navigate":
+      return <Navigate data={card.data as NavigateCardData} />;
     default:
       return null;
   }
+}
+
+/** Voice already pushed the route; in the typed chat this is the affordance that
+ *  actually performs the navigation the agent offered. It has to select the
+ *  workspace/project too — a bare link to "/" would land on whatever was already
+ *  selected, not the thing the agent named. */
+function Navigate({ data }: { data: NavigateCardData }) {
+  const router = useRouter();
+  const applyNavSelection = useNavSelection();
+  return (
+    <button
+      onClick={() => {
+        applyNavSelection(data);
+        router.push(data.route);
+      }}
+      className="card flex w-full items-center gap-2.5 p-2.5 text-left transition-colors hover:border-border-strong"
+    >
+      <ArrowRight className="h-3.5 w-3.5 text-accent" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] font-medium text-text">{data.label}</div>
+        <div className="text-2xs text-text-faint">Open</div>
+      </div>
+    </button>
+  );
 }
 
 function ActionTask({ data, label, icon }: { data: TaskLike; label: string; icon: React.ReactNode }) {
