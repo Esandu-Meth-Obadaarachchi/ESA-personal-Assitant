@@ -18,6 +18,7 @@ export function DayDetail({
   events,
   projColor,
   projName,
+  foreignWs,
   onOpenTask,
   onSetStatus,
   onAdd,
@@ -28,6 +29,8 @@ export function DayDetail({
   events: GEvent[];
   projColor: Map<string, string>;
   projName: Map<string, string>;
+  /** taskId -> workspace name for tasks merged in from another workspace. */
+  foreignWs?: Map<string, string>;
   onOpenTask: (t: Task) => void;
   onSetStatus: (id: string, s: Task["status"]) => void;
   onAdd: (title: string) => void;
@@ -45,36 +48,62 @@ export function DayDetail({
           <p className="py-6 text-center text-[13px] text-text-faint">Nothing scheduled.</p>
         )}
 
-        {sortedTasks.map((t) => (
-          <div
-            key={t.id}
-            className="group flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-surface-2"
-          >
-            <StatusControl status={t.status} onChange={(s) => onSetStatus(t.id, s)} size={15} />
-            <span className="mono w-11 shrink-0 text-2xs text-text-faint">
-              {t.dueTime ?? "all-day"}
-            </span>
-            <button
-              onClick={() => {
-                onOpenTask(t);
-                onClose();
-              }}
-              className={cn(
-                "flex min-w-0 flex-1 items-center gap-2 text-left text-[13px]",
-                t.status === "done" ? "text-text-faint line-through" : "text-text"
-              )}
+        {sortedTasks.map((t) => {
+          // From another workspace: shown so the clash is visible, but not
+          // actionable here — its project is not loaded in this workspace.
+          const foreign = foreignWs?.get(t.id);
+          if (foreign) {
+            return (
+              <div
+                key={t.id}
+                className="flex items-center gap-2.5 rounded-md px-2 py-1.5 opacity-60"
+                title={`${t.title} — ${foreign} (other workspace)`}
+              >
+                <span className="grid h-[15px] w-[15px] shrink-0 place-items-center">
+                  <span
+                    className="h-2 w-2 rounded-[3px]"
+                    style={{ background: projColor.get(t.projectId) ?? "rgb(var(--text-faint))" }}
+                  />
+                </span>
+                <span className="mono w-11 shrink-0 text-2xs text-text-faint">
+                  {t.dueTime ?? "all-day"}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[13px] text-text-muted">{t.title}</span>
+                <span className="shrink-0 text-2xs text-text-faint">{foreign}</span>
+              </div>
+            );
+          }
+          return (
+            <div
+              key={t.id}
+              className="group flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-surface-2"
             >
-              <span
-                className="h-2 w-2 shrink-0 rounded-[3px]"
-                style={{ background: projColor.get(t.projectId) ?? "rgb(var(--text-faint))" }}
-              />
-              <span className="truncate">{t.title}</span>
-            </button>
-            <span className="hidden shrink-0 text-2xs text-text-faint sm:inline">
-              {projName.get(t.projectId)}
-            </span>
-          </div>
-        ))}
+              <StatusControl status={t.status} onChange={(s) => onSetStatus(t.id, s)} size={15} />
+              <span className="mono w-11 shrink-0 text-2xs text-text-faint">
+                {t.dueTime ?? "all-day"}
+              </span>
+              <button
+                onClick={() => {
+                  onOpenTask(t);
+                  onClose();
+                }}
+                className={cn(
+                  "flex min-w-0 flex-1 items-center gap-2 text-left text-[13px]",
+                  t.status === "done" ? "text-text-faint line-through" : "text-text"
+                )}
+              >
+                <span
+                  className="h-2 w-2 shrink-0 rounded-[3px]"
+                  style={{ background: projColor.get(t.projectId) ?? "rgb(var(--text-faint))" }}
+                />
+                <span className="truncate">{t.title}</span>
+              </button>
+              <span className="hidden shrink-0 text-2xs text-text-faint sm:inline">
+                {projName.get(t.projectId)}
+              </span>
+            </div>
+          );
+        })}
 
         {sortedEvents.map((e) => (
           <div key={e.id} className="flex items-center gap-2.5 rounded-md px-2 py-1.5" title="Google Calendar">

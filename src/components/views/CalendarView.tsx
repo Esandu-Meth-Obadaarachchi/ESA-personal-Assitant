@@ -27,8 +27,10 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useWorkspace } from "@/lib/data/WorkspaceContext";
 import { useTaskActions } from "@/lib/data/useTaskActions";
+import { useAuth } from "@/lib/auth/AuthContext";
 import { authedFetch } from "@/lib/api";
 import { toISODate } from "@/lib/date";
+import { taskAssignees } from "@/lib/utils";
 import type { Project, Task } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { CalendarSync } from "@/components/project/CalendarSync";
@@ -56,8 +58,44 @@ export function CalendarView({
   projects?: Project[];
 }) {
   const ctx = useWorkspace();
-  const tasks = tasksProp ?? ctx.workspaceTasks;
+  const { user } = useAuth();
   const projects = projectsProp ?? ctx.projects;
+
+  /**
+   * Scheduled work in *other* workspaces still occupies the same hours. Left out,
+   * a deadline set in one workspace is invisible while you plan in another and you
+   * double-book yourself. These are merged in read-only and shown dimmed — they are
+   * context ("you are busy then"), not work you can act on from here.
+   *
+   * Deliberately narrow: due-dated, already synced to Google Calendar, and assigned
+   * to you. Anything looser would drown the current workspace's own calendar.
+   */
+  const crossWorkspace = useMemo(() => {
+    if (tasksProp) return []; // caller supplied an explicit set (My Tasks) — respect it
+    const wsId = ctx.currentWorkspace?.id;
+    const uid = user?.uid;
+    if (!wsId || !uid) return [];
+    return ctx.allTasks.filter(
+      (t) =>
+        t.workspaceId !== wsId &&
+        !!t.dueDate &&
+        !!t.googleEventId &&
+        taskAssignees(t).some((a) => a.id === uid)
+    );
+  }, [tasksProp, ctx.allTasks, ctx.currentWorkspace?.id, user?.uid]);
+
+  const tasks = useMemo(
+    () => tasksProp ?? [...ctx.workspaceTasks, ...crossWorkspace],
+    [tasksProp, ctx.workspaceTasks, crossWorkspace]
+  );
+
+  /** taskId -> owning workspace name, for the chips that came from elsewhere. */
+  const foreignWs = useMemo(() => {
+    const names = new Map(ctx.workspaces.map((w) => [w.id, w.name]));
+    return new Map(
+      crossWorkspace.map((t) => [t.id, names.get(t.workspaceId) ?? "Other workspace"])
+    );
+  }, [crossWorkspace, ctx.workspaces]);
   const actions = useTaskActions();
   const [month, setMonth] = useState(() => new Date());
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -159,6 +197,7 @@ export function CalendarView({
               tasks={byDay.get(toISODate(day)) ?? []}
               events={gEvents[toISODate(day)] ?? []}
               projColor={projColor}
+              foreignWs={foreignWs}
               onOpenTask={onOpenTask}
               onSelectDay={setSelectedDay}
             />
@@ -176,6 +215,7 @@ export function CalendarView({
           events={gEvents[selectedDay] ?? []}
           projColor={projColor}
           projName={projName}
+          foreignWs={foreignWs}
           onOpenTask={onOpenTask}
           onSetStatus={(id, s) => actions.setStatus(id, s)}
           onAdd={(title) => actions.add(title, { dueDate: selectedDay })}
@@ -192,6 +232,7 @@ function DayCell({
   tasks,
   events,
   projColor,
+  foreignWs,
   onOpenTask,
   onSelectDay,
 }: {
@@ -200,6 +241,8 @@ function DayCell({
   tasks: Task[];
   events: GEvent[];
   projColor: Map<string, string>;
+  /** taskId -> workspace name, for tasks merged in from another workspace. */
+  foreignWs: Map<string, string>;
   onOpenTask: (t: Task) => void;
   onSelectDay: (iso: string) => void;
 }) {
@@ -232,7 +275,13 @@ function DayCell({
       </div>
       <div className="space-y-1 overflow-hidden">
         {shownTasks.map((t) => (
-          <Chip key={t.id} task={t} color={projColor.get(t.projectId)} onOpen={() => onOpenTask(t)} />
+          <Chip
+            key={t.id}
+            task={t}
+            color={projColor.get(t.projectId)}
+            foreignLabel={foreignWs.get(t.id)}
+            onOpen={() => onOpenTask(t)}
+          />
         ))}
         {shownEvents.map((e) => (
           <GChip key={e.id} event={e} />
@@ -262,36 +311,50 @@ function Chip({
   color,
   onOpen,
   overlay,
+  foreignLabel,
 }: {
   task: Task;
   color?: string;
   onOpen?: () => void;
   overlay?: boolean;
+  /** Owning workspace name when this task belongs to a different workspace. */
+  foreignLabel?: string;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
+  // Tasks from another workspace are read-only here: dragging would reschedule
+  // work outside the workspace you are looking at, and opening the drawer needs
+  // that workspace's project loaded. They are a busy marker, nothing more.
+  const readOnly = !!foreignLabel;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+    disabled: readOnly || overlay,
+  });
   return (
     <div
       ref={overlay ? undefined : setNodeRef}
-      {...(overlay ? {} : attributes)}
-      {...(overlay ? {} : listeners)}
+      {...(overlay || readOnly ? {} : attributes)}
+      {...(overlay || readOnly ? {} : listeners)}
       onClick={(e) => {
         e.stopPropagation();
-        onOpen?.();
+        if (!readOnly) onOpen?.();
       }}
-      title={task.title}
+      title={readOnly ? `${task.title} — ${foreignLabel} (other workspace)` : task.title}
       className={cn(
-        "flex cursor-pointer items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 text-2xs text-text",
-        overlay ? "shadow-pop" : "hover:border-border-strong",
+        "flex items-center gap-1 rounded border px-1.5 py-0.5 text-2xs",
+        readOnly
+          ? "cursor-default border-dashed border-border/70 bg-transparent text-text-faint"
+          : "cursor-pointer border-border bg-surface text-text",
+        overlay ? "shadow-pop" : !readOnly && "hover:border-border-strong",
         isDragging && "opacity-40",
         task.status === "done" && "text-text-faint line-through"
       )}
     >
       <span
-        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        className={cn("h-1.5 w-1.5 shrink-0 rounded-full", readOnly && "opacity-50")}
         style={{ background: color ?? "rgb(var(--text-faint))" }}
       />
       {task.dueTime && <span className="mono shrink-0 opacity-70">{task.dueTime}</span>}
       <span className="truncate">{task.title}</span>
+      {readOnly && <span className="ml-auto shrink-0 truncate opacity-70">·{foreignLabel}</span>}
     </div>
   );
 }
