@@ -2,6 +2,18 @@
 
 Notable changes, newest first. Product name: **Lune AI**.
 
+## 2026-07-21 — Voice ("Hey Lune")
+
+### Added
+- **Always-on voice control.** Say **"Hey Lune"** from any screen, speak a command, and Lune answers aloud. A floating mic control lives in `AppFrame`, so it works everywhere in the app shell — clicking it also captures a command without the wake word, for browsers where continuous listening is unreliable. Built entirely on the browser's Web Speech APIs: **no third-party service, no extra API key, no added cost** beyond the Claude call the command triggers. Chrome/Edge in practice; the control hides itself where the API is missing. Full write-up in `docs/VOICE.md`.
+- **`navigate_to` agent tool.** The agent can now move the user between screens ("go to today", "open the Website project"), which voice needed and the typed chat gets for free as a clickable card. The model picks an enum key and the server maps it to a path via `NAV_ROUTES`, so a route can never come from model output.
+- **Voice mode on the persona.** `/api/chat` takes a `voice` flag that asks for answers under 40 words in plain spoken prose — markdown and bullet lists read terribly aloud. `speakable()` strips any that survives and caps length, since Chrome's synthesis truncates long utterances anyway.
+
+### Notes
+- The mic is closed while Lune thinks and speaks, otherwise she hears her own reply through the speakers and re-triggers on the wake word in it.
+- Voice conversations keep a few turns in memory for context but are **not** saved to `chats` — `/agent` remains the surface with history.
+- Project tabs (Board, Tree, Calendar…) are not voice-reachable: the tab is local state in `app/(app)/page.tsx`, not a route. Making tabs URL-driven would fix it.
+
 ## 2026-07-16 — Docs deep-dive
 
 - Rewrote `docs/RAG.md` and `docs/AGENTIC_RAG.md` as full teaching guides: the ingestion pipeline (parse/chunk/embed/upsert), embeddings and the vector store, the bi-encoder vs cross-encoder two-stage retrieval, the agentic loop, the agent tool loop, the cost model, security/isolation, observability, design choices and every fix — the what, how and why. Refreshed `docs/ARCHITECTURE.md`.

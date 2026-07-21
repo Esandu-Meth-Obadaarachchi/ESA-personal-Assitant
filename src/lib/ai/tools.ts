@@ -36,6 +36,19 @@ interface TaskNodeInput {
   subtasks?: TaskNodeInput[];
 }
 
+/** The screens `navigate_to` may open, keyed by the enum value the model picks.
+ *  Routes are never taken from model output — the model chooses a key, the server
+ *  maps it to a path. Keep in step with the nav in `components/shell/Sidebar.tsx`. */
+const NAV_ROUTES: Record<string, { route: string; label: string }> = {
+  today: { route: "/today", label: "Today" },
+  overview: { route: "/overview", label: "Workspace overview" },
+  workspaces: { route: "/workspaces", label: "All workspaces" },
+  my_tasks: { route: "/my-tasks", label: "All my tasks" },
+  pages: { route: "/pages", label: "Pages" },
+  knowledge: { route: "/knowledge", label: "Knowledge" },
+  agent: { route: "/agent", label: "Agent" },
+};
+
 /** Tool schemas advertised to Claude. */
 export const TOOLS: Anthropic.Tool[] = [
   {
@@ -142,6 +155,27 @@ export const TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: { project: { type: "string" } },
+    },
+  },
+  {
+    name: "navigate_to",
+    description:
+      "Move the user to a screen in the app. Use for 'go to…', 'open…', 'take me to…', 'show me the… page'. Only for navigating the UI — to ANSWER a question about tasks or documents use list_tasks or search_knowledge instead.",
+    input_schema: {
+      type: "object",
+      properties: {
+        destination: {
+          type: "string",
+          enum: [...Object.keys(NAV_ROUTES), "project"],
+          description:
+            "Which screen to open. Use \"project\" together with `project` to open a specific project's board.",
+        },
+        project: {
+          type: "string",
+          description: "Project name — required when destination is \"project\".",
+        },
+      },
+      required: ["destination"],
     },
   },
 ];
@@ -407,6 +441,23 @@ export async function executeTool(
         tasks,
         knowledge: chunks.map((c) => ({ source: c.source, text: c.text.slice(0, 500) })),
       });
+    }
+
+    case "navigate_to": {
+      const dest = String(input.destination ?? "");
+      if (dest === "project") {
+        const target = resolveProject(ctx, input.project ? String(input.project) : undefined);
+        if (!target) return `No project found matching "${input.project ?? ""}".`;
+        ctx.cards.push({
+          kind: "navigate",
+          data: { route: "/", label: target.name, projectId: target.id },
+        });
+        return `Opening the ${target.name} project.`;
+      }
+      const known = NAV_ROUTES[dest];
+      if (!known) return `"${dest}" is not a screen in this app.`;
+      ctx.cards.push({ kind: "navigate", data: known });
+      return `Opening ${known.label}.`;
     }
 
     default:

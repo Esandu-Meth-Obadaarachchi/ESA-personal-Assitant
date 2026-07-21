@@ -265,12 +265,28 @@ export interface RetrievedChunk {
   project?: string;
 }
 
-export type AgentCardKind = "created_task" | "updated_task" | "task_list" | "sources" | "digest";
+export type AgentCardKind =
+  | "created_task"
+  | "updated_task"
+  | "task_list"
+  | "sources"
+  | "digest"
+  | "navigate";
 
 export interface AgentCard {
   kind: AgentCardKind;
   // deliberately loose — each card renderer narrows this
   data: unknown;
+}
+
+/** Payload of a `navigate` card. The route is always one the server picked from a
+ *  fixed set (`NAV_ROUTES` in `lib/ai/tools.ts`), never a string the model invented,
+ *  so the client can push it without validating for open redirects. */
+export interface NavigateCardData {
+  route: string;
+  label: string;
+  /** Set when the destination is a project — select it before pushing "/". */
+  projectId?: string;
 }
 
 export interface ChatMessage {

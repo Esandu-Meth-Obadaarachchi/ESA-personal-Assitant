@@ -18,11 +18,12 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { message, workspaceId, projectId, history } = (await req.json()) as {
+    const { message, workspaceId, projectId, history, voice } = (await req.json()) as {
       message?: string;
       workspaceId?: string;
       projectId?: string;
       history?: AgentTurn[];
+      voice?: boolean;
     };
     if (!message) {
       return NextResponse.json({ error: "message is required" }, { status: 400 });
@@ -65,6 +66,7 @@ export async function POST(req: Request) {
       workspaceName: workspaces.find((w) => w.id === workspaceId)?.name ?? "your workspaces",
       projectName: projects.find((p) => p.id === projectId)?.name,
       projectList,
+      voice: !!voice,
     });
 
     return NextResponse.json(result);

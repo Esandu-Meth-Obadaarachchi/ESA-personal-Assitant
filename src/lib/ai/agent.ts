@@ -34,7 +34,7 @@ export async function runAgent(
   message: string,
   history: AgentTurn[],
   ctx: ToolContext,
-  meta: { workspaceName: string; projectName?: string; projectList: string }
+  meta: { workspaceName: string; projectName?: string; projectList: string; voice?: boolean }
 ): Promise<AgentResult> {
   const system = buildAgentSystem({
     userName: ctx.userName,
@@ -42,6 +42,7 @@ export async function runAgent(
     projectName: meta.projectName,
     today: new Date().toISOString().slice(0, 10),
     projectList: meta.projectList,
+    voice: meta.voice,
   });
 
   // Send only the last 5 turns as context. Keeps the model prompt small and
